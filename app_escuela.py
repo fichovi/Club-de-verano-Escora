@@ -5,7 +5,7 @@ from datetime import date, datetime
 import json
 import os
 
-# --- 1. CONFIGURACIÓN DE PÁGINA (MARCA BLANCA NATIVA) ---
+# --- 1. CONFIGURACIÓN DE PÁGINA (MARCA BLANCA MOBILE-FIRST) ---
 st.set_page_config(
     page_title="Control Club de Verano", 
     page_icon="🏆", 
@@ -13,63 +13,49 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. INYECCIÓN DE CSS AVANZADO (OCULTAR LOGOS DE STREAMLIT Y DISEÑO MÓVIL AUTOMÁTICO) ---
+# --- 2. INYECCIÓN DE CSS AVANZADO (INTERFAZ ULTRA-COMPACTA ADAPTADA A MÓVILES) ---
 st.markdown("""
     <style>
-        /* Ocultar elementos oficiales de Streamlit y GitHub */
+        /* Ocultar menús nativos y logos de Streamlit / GitHub */
         header {visibility: hidden !important;}
         footer {visibility: hidden !important;}
         div[data-testid="stDecoration"] {display: none !important;}
         div[data-testid="stSidebar"] {display: none !important;}
         
-        /* Forzar que las columnas superiores se comporten como una barra corredera horizontal */
+        /* Reducir drásticamente tamaños de letra de títulos para pantallas móviles */
+        h1 { font-size: 1.15rem !important; margin-bottom: 2px !important; padding-top: 0px !important; font-weight: bold; }
+        h2 { font-size: 1.0rem !important; margin-bottom: 2px !important; font-weight: bold; }
+        h3 { font-size: 0.9rem !important; margin-bottom: 2px !important; font-weight: bold; }
+        p, span, label, .stMarkdown { font-size: 0.8rem !important; }
+        
+        /* Eliminar márgenes y paddings excesivos para pegar el contenido */
+        .block-container { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+        .element-container { margin-bottom: 0.2rem !important; }
+        div[data-testid="stVerticalBlock"] { gap: 0.2rem !important; }
+        
+        /* Barra de navegación superior (Elementos súper pegados y deslizables) */
         div[data-testid="stHorizontalBlock"] {
             overflow-x: auto !important;
             flex-wrap: nowrap !important;
             white-space: nowrap !important;
-            padding: 5px 0px !important;
-            gap: 8px !important;
+            padding: 1px 0px !important;
+            gap: 2px !important; 
         }
         
-        /* Estilizar los botones de navegación superiores (Menú gris permanente) */
+        /* Botones del menú principal */
         div[data-testid="stHorizontalBlock"] button {
             background-color: #f0f2f6 !important;
             color: #31333F !important;
-            border-radius: 20px !important;
-            padding: 6px 16px !important;
-            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            padding: 3px 8px !important;
+            border: 1px solid #cbd5e1 !important;
+            font-size: 12px !important;
             font-weight: bold !important;
         }
         
-        /* --- DISEÑO DE MACRO-BOTONES TÁCTILES GRANDES EN VERTICAL --- */
-        .stButton > button {
-            width: 100% !important;
-            height: 55px !important;
-            font-size: 18px !important;
-            font-weight: bold !important;
-            border-radius: 12px !important;
-            margin-bottom: 8px !important;
-        }
-        
-        /* LÓGICA DE DETECCIÓN: Si la fila tiene exactamente 3 columnas, aplicamos semáforo de color */
-        /* Columna 1 de 3 -> Verde */
-        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-of-type(1):nth-last-of-type(3) .stButton > button {
-            background-color: #22c55e !important;
-            color: white !important;
-            border: 1px solid #16a34a !important;
-        }
-        /* Columna 2 de 3 -> Naranja */
-        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-of-type(2):nth-last-of-type(2) .stButton > button {
-            background-color: #f97316 !important;
-            color: white !important;
-            border: 1px solid #ea580c !important;
-        }
-        /* Columna 3 de 3 -> Rojo */
-        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-of-type(3):nth-last-of-type(1) .stButton > button {
-            background-color: #ef4444 !important;
-            color: white !important;
-            border: 1px solid #dc2626 !important;
-        }
+        /* Reducir altura de las cajas de opciones de selección (Radios de puntuación) */
+        div[data-testid="stWidgetLabel"] { margin-bottom: 0px !important; padding-bottom: 0px !important; }
+        div[data-row-items] { gap: 4px !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,6 +85,11 @@ def guardar_datos_locales():
         json.dump(st.session_state.asistencia, f, ensure_ascii=False)
     with open("local_turno.json", "w", encoding="utf-8") as f:
         json.dump(st.session_state.estar_de_turno, f, ensure_ascii=False)
+    with open("local_cancelaciones.json", "w", encoding="utf-8") as f:
+        json.dump({
+            "no_deporte": list(st.session_state.dates_no_deporte),
+            "no_taller": list(st.session_state.dates_no_taller)
+        }, f)
 
 def cargar_datos_locales():
     if os.path.exists("local_alumnos_master.json"):
@@ -135,6 +126,14 @@ def cargar_datos_locales():
             st.session_state.estar_de_turno = json.load(f)
     else:
         st.session_state.estar_de_turno = {f"Semana {i}": {"Lunes": "", "Martes": "", "Miércoles": "", "Jueves": "", "Viernes": ""} for i in range(1, 5)}
+    if os.path.exists("local_cancelaciones.json"):
+        with open("local_cancelaciones.json", "r") as f:
+            data = json.load(f)
+            st.session_state.dates_no_deporte = set(data.get("no_deporte", []))
+            st.session_state.dates_no_taller = set(data.get("no_taller", []))
+    else:
+        st.session_state.dates_no_deporte = set()
+        st.session_state.dates_no_taller = set()
 
 if 'alumnos_master' not in st.session_state:
     cargar_datos_locales()
@@ -145,23 +144,23 @@ LISTA_ENCARGOS_OFICIALES = ["ORDEN SALA DE ESTUDIO", "ORDEN COMEDOR", "ORDEN TAL
 if 'menu_actual' not in st.session_state:
     st.session_state.menu_actual = "🏠 Inicio"
 
-# --- 4. BARRA DE CONFIGURACIÓN SUPERIOR COMPACTA ---
-c_conf1, c_conf2, c_conf3 = st.columns([1, 1, 1])
-semana_act = c_conf1.selectbox("📅 Bloque:", ["Semana 1", "Semana 2", "Semana 3", "Semana 4"], label_visibility="collapsed")
-fecha_hoy = c_conf2.date_input("📆 Fecha:", date.today(), label_visibility="collapsed")
+# --- 4. CONFIGURACIÓN COMPACTA DE CABECERA ---
+c_conf1, c_conf2 = st.columns(2)
+semana_act = c_conf1.selectbox("Bloque:", ["Semana 1", "Semana 2", "Semana 3", "Semana 4"], label_visibility="collapsed")
+fecha_hoy = c_conf2.date_input("Fecha:", date.today(), label_visibility="collapsed")
 
-# --- 5. MENÚ HORIZONTAL DE BOTONES CORREDEROS AUTOMÁTICO ---
-st.write("---")
-items_menu = ["🏠 Inicio", "📊 Clasificación", "📚 Estudio", "🙏 Oraciones", "⚽ Deporte", "🙌 Deportividad", "🎨 Taller", "🧹 Encargos", "🍽️ Comedor", "💪 Extras", "🎥 Vídeo", "⚠️ Multas", "🛠️ Admin"]
+alumnos_activos = [al for al in st.session_state.alumnos_master if st.session_state.asistencia.get(semana_act, {}).get(al, True)]
+
+# --- 5. MENÚ SUPERIOR DE BOTONES PEGADOS ---
+items_menu = ["🏠 Inicio", "👥 Asistencia", "📊 Clasificación", "📚 Estudio", "🙏 Oraciones", "⚽ Deporte", "🙌 Deportividad", "🎨 Taller", "🧹 Encargos", "🍽️ Comedor", "💪 Extras", "🎥 Vídeo", "⚠️ Multas", "🛠️ Admin"]
 nav_cols = st.columns(len(items_menu))
-
 for idx, item in enumerate(items_menu):
+    if st.session_state.menu_actual == item:
+        st.markdown(f"<style>div[data-testid='stHorizontalBlock'] > div:nth-of-type({idx+1}) button {{ background-color: #1e3a8a !important; color: white !important; border: 1px solid #1e3a8a !important; }}</style>", unsafe_allow_html=True)
     if nav_cols[idx].button(item, key=f"nav_top_{item}"):
         st.session_state.menu_actual = item
         st.rerun()
 st.write("---")
-
-alumnos_activos = [al for al in st.session_state.alumnos_master if st.session_state.asistencia.get(semana_act, {}).get(al, True)]
 
 def get_puntos_hoy(alumno, actividad, default_val=None):
     df = st.session_state.historico_puntos
@@ -177,81 +176,120 @@ def set_puntos_hoy(alumno, actividad, puntos, detalle=""):
         st.session_state.historico_puntos.loc[cond, 'Puntos'] = puntos
         st.session_state.historico_puntos.loc[cond, 'Detalle'] = detalle
     else:
-        nueva_fila = pd.DataFrame([{
-            'Fecha': str(fecha_hoy), 'Alumno': alumno, 'Actividad': actividad, 
-            'Puntos': puntos, 'Detalle': detalle, 'Semana': semana_act
-        }])
+        nueva_fila = pd.DataFrame([{'Fecha': str(fecha_hoy), 'Alumno': alumno, 'Actividad': actividad, 'Puntos': puntos, 'Detalle': detalle, 'Semana': semana_act}])
         st.session_state.historico_puntos = pd.concat([st.session_state.historico_puntos, nueva_fila], ignore_index=True)
     guardar_datos_locales()
 
-# --- PANTALLA: INICIO & AGENDA ---
+# --- PANTALLA: INICIO & HORARIO REAL ADAPTADO AL CALENDARIO ---
 if st.session_state.menu_actual == "🏠 Inicio":
-    st.subheader("📆 Horario y Agenda del Día")
+    st.subheader("📆 Horario Oficial del Campus")
+    st.markdown(f"👦 **Asistentes esta semana:** `{len(alumnos_activos)} de {len(st.session_state.alumnos_master)}`")
+    
+    # MEJORA: Calcular la hora comparándola dinámicamente con la fecha elegida en el selector
+    es_dia_actual = (str(fecha_hoy) == str(date.today()))
     hora_ahora = datetime.now().time()
+    
     cronograma = [
-        {"inicio": "09:00", "fin": "10:00", "tarea": "🙏 Acogida y Oración de la mañana"},
-        {"inicio": "10:00", "fin": "11:30", "tarea": "📚 Hora de Estudio Silencioso"},
-        {"inicio": "11:30", "fin": "12:00", "tarea": " Sandwich y Almuerzo de Compañeros"},
-        {"inicio": "12:00", "fin": "13:30", "tarea": "🎨 Talleres Creativos Manuales"},
-        {"inicio": "13:30", "fin": "15:00", "tarea": "🍽️ Almuerzo, Comedor y Turno de Limpieza"},
-        {"inicio": "15:00", "fin": "15:30", "tarea": "🎥 Vídeo de Formación y Preguntas Masivas"},
-        {"inicio": "15:30", "fin": "17:00", "tarea": " Torneo de Deportes y Juegos de Grupo"}
+        {"inicio": "09:00", "fin": "10:00", "tarea": "🎒 Tareas de Verano"},
+        {"inicio": "10:00", "fin": "11:00", "tarea": "🥪 Almuerzo y Charla"},
+        {"inicio": "11:00", "fin": "12:30", "tarea": "Torneo de Tenis y Pádel"},
+        {"inicio": "12:30", "fin": "14:00", "tarea": "🏊 Piscina Refrescante"},
+        {"inicio": "14:00", "fin": "15:00", "tarea": "🍽️ Comedor y Servicio"},
+        {"inicio": "15:00", "fin": "17:00", "tarea": "⚽ Pachanga + Piscina de Tarde"},
+        {"inicio": "17:00", "fin": "17:15", "tarea": "🏁 Fin de la Jornada"}
     ]
+    
+    # Traducir fecha elegida a nombre de día para dar claridad al monitor
+    dias_semana_es = {"Monday": "Lunes", "Tuesday": "Martes", "Wednesday": "Miércoles", "Thursday": "Jueves", "Friday": "Viernes", "Saturday": "Sábado", "Sunday": "Domingo"}
+    nombre_dia_elegido = dias_semana_es.get(fecha_hoy.strftime("%A"), str(fecha_hoy))
+    st.info(f"📅 Mostrando planificación programada para el **{nombre_dia_elegido} {fecha_hoy.strftime('%d/%m/%Y')}**")
+    
     for c in cronograma:
         t_ini = datetime.strptime(c["inicio"], "%H:%M").time()
         t_fin = datetime.strptime(c["fin"], "%H:%M").time()
-        if t_ini <= hora_ahora <= t_fin:
-            st.markdown(f'<div style="background-color: #d1fae5; border-left: 5px solid #10b981; padding: 12px; border-radius: 6px; margin-bottom: 8px;"><strong>⚡ AHORA MISMO ({c["inicio"]} - {c["fin"]}):</strong> {c["tarea"]}</div>', unsafe_allow_html=True)
+        
+        # El resaltado verde brillante (AHORA) solo se activa si estás visualizando el día de hoy real en el calendario
+        if es_dia_actual and (t_ini <= hora_ahora <= t_fin):
+            st.markdown(f'<div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 6px; border-radius: 4px; margin-bottom: 3px; font-size:13px;"><strong>⚡ AHORA MISMO ({c["inicio"]} - {c["fin"]}):</strong> {c["tarea"]}</div>', unsafe_allow_html=True)
         else:
-            st.markdown(f'<div style="background-color: #f3f4f6; border-left: 5px solid #9ca3af; padding: 10px; border-radius: 6px; margin-bottom: 8px; color: #6b7280;">⏳ {c["inicio"]} - {c["fin"]}: {c["tarea"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color: #f3f4f6; border-left: 4px solid #9ca3af; padding: 5px; border-radius: 4px; margin-bottom: 3px; color: #6b7280; font-size:12px;">⏳ {c["inicio"]} - {c["fin"]}: {c["tarea"]}</div>', unsafe_allow_html=True)
+
+# --- PANTALLA: ASISTENCIA SEMANAL ---
+elif st.session_state.menu_actual == "👥 Asistencia":
+    st.subheader("👥 Control de Asistencia Semanal")
+    st.markdown(f"👦 **Total Presentes:** `{len(alumnos_activos)} de {len(st.session_state.alumnos_master)}`")
+    st.caption("Desmarca a los niños que no asistan durante esta semana:")
+    if semana_act not in st.session_state.asistencia: st.session_state.asistencia[semana_act] = {}
+    for al in sorted(st.session_state.alumnos_master):
+        if al not in st.session_state.asistencia[semana_act]: st.session_state.asistencia[semana_act][al] = True
+        val_ch = st.checkbox(al, value=st.session_state.asistencia[semana_act][al], key=f"asist_tab_{al}")
+        if val_ch != st.session_state.asistencia[semana_act][al]:
+            st.session_state.asistencia[semana_act][al] = val_ch
+            guardar_datos_locales()
+            st.rerun()
 
 # --- PANTALLA: CLASIFICACIÓN ---
 elif st.session_state.menu_actual == "📊 Clasificación":
     st.subheader("📊 Resultados de Clasificación")
     tab_s, tab_g = st.tabs(["📆 Clasificación Semanal", "🏆 Acumulado General"])
-    df_hist = st.session_state.historico_puntos
+    df_hist = st.session_state.historico_puntos.copy()
     
+    def procesar_ranking_con_defaults(filtrar_semana=None):
+        df_base = df_hist[df_hist['Semana'] == filtrar_semana].copy() if filtrar_semana else df_hist.copy()
+        if not df_base.empty:
+            df_grouped = df_base.groupby('Alumno')['Puntos'].sum().reset_index()
+            dict_totales = dict(zip(df_grouped['Alumno'], df_grouped['Puntos']))
+        else:
+            dict_totales = {}
+        lista_ninos = alumnos_activos if filtrar_semana else st.session_state.alumnos_master
+        for al in lista_ninos:
+            if al not in dict_totales: dict_totales[al] = 0
+            fechas_evaluadas = df_hist['Fecha'].unique() if not df_hist.empty else [str(fecha_hoy)]
+            for f in fechas_evaluadas:
+                sem_f = df_hist[df_hist['Fecha'] == f]['Semana'].values[0] if not df_hist.empty and f in df_hist['Fecha'].values else  semana_act
+                if not st.session_state.asistencia.get(sem_f, {}).get(al, True): continue
+                if filtrar_semana and sem_f != filtrar_semana: continue
+                
+                has_explicit_dep = not df_hist[(df_hist['Fecha'] == f) & (df_hist['Alumno'] == al) & (df_hist['Actividad'] == "Deportividad")].empty
+                if not has_explicit_dep and f not in st.session_state.dates_no_deporte: dict_totales[al] += 5
+                
+                has_explicit_tal = not df_hist[(df_hist['Fecha'] == f) & (df_hist['Alumno'] == al) & (df_hist['Actividad'] == "Taller")].empty
+                if not has_explicit_tal and f not in st.session_state.dates_no_taller: dict_totales[al] += 5
+        df_res = pd.DataFrame(list(dict_totales.items()), columns=['Alumno', 'Puntos'])
+        return df_res.sort_values(by="Puntos", ascending=True)
+
     with tab_s:
-        df_tot_sem = df_hist[df_hist['Semana'] == semana_act].groupby('Alumno')['Puntos'].sum().reset_index() if not df_hist.empty else pd.DataFrame(columns=['Alumno', 'Puntos'])
-        for al in alumnos_activos:
-            if al not in df_tot_sem['Alumno'].values: df_tot_sem = pd.concat([df_tot_sem, pd.DataFrame([{'Alumno': al, 'Puntos': 0}])], ignore_index=True)
-        df_tot_sem = df_tot_sem[df_tot_sem['Alumno'].isin(alumnos_activos)].sort_values(by="Puntos", ascending=True)
+        df_tot_sem = procesar_ranking_con_defaults(semana_act)
         fig_s = px.bar(df_tot_sem, x='Puntos', y='Alumno', orientation='h', color='Puntos', color_continuous_scale='Mint', text_auto=True)
         fig_s.update_traces(textposition='outside')
-        fig_s.update_layout(height=600, xaxis=dict(fixedrange=True), yaxis=dict(fixedrange=True))
-        st.plotly_chart(fig_s, width='stretch', config={'scrollZoom': False, 'displayModeBar': False})
+        fig_s.update_layout(height=550, xaxis=dict(fixedrange=True), yaxis=dict(fixedrange=True), margin=dict(l=0, r=0, t=20, b=0))
+        st.plotly_chart(fig_s, width='stretch', config={'displayModeBar': False})
 
     with tab_g:
-        df_tot_gen = df_hist.groupby('Alumno')['Puntos'].sum().reset_index() if not df_hist.empty else pd.DataFrame(columns=['Alumno', 'Puntos'])
-        for al in st.session_state.alumnos_master:
-            if al not in df_tot_gen['Alumno'].values: df_tot_gen = pd.concat([df_tot_gen, pd.DataFrame([{'Alumno': al, 'Puntos': 0}])], ignore_index=True)
-        df_tot_gen = df_tot_gen.sort_values(by="Puntos", ascending=True)
+        df_tot_gen = procesar_ranking_con_defaults(None)
         fig_g = px.bar(df_tot_gen, x='Puntos', y='Alumno', orientation='h', color='Puntos', color_continuous_scale='Blues', text_auto=True)
         fig_g.update_traces(textposition='outside')
-        fig_g.update_layout(height=700, xaxis=dict(fixedrange=True), yaxis=dict(fixedrange=True))
-        st.plotly_chart(fig_g, width='stretch', config={'scrollZoom': False, 'displayModeBar': False})
+        fig_g.update_layout(height=650, xaxis=dict(fixedrange=True), yaxis=dict(fixedrange=True), margin=dict(l=0, r=0, t=20, b=0))
+        st.plotly_chart(fig_g, width='stretch', config={'displayModeBar': False})
         
     st.markdown("---")
     st.subheader("🔍 Historial Técnico Completo")
     st.dataframe(st.session_state.historico_puntos.iloc[::-1], width='stretch')
 
-# --- PANTALLA: ESTUDIO (CORREGIDA) ---
+# --- PANTALLA: ESTUDIO ---
 elif st.session_state.menu_actual == "📚 Estudio":
     st.subheader("📚 Puntuación: Hora de Estudio")
+    opciones_estudio = {"No evaluado": None, "❌ 0 Puntos": 0, "⚠️ 2 Puntos": 2, "✅ 5 Puntos": 5}
     for al in sorted(alumnos_activos):
-        st.markdown(f"### 🧑 {al}")
-        cb1, cb2, cb3 = st.columns(3)
-        # CORRECCIÓN: Eliminados los argumentos 'class_name', ahora el CSS pinta por posición
-        if cb1.button("✅ +5 Puntos", key=f"est_g_{al}"):
-            set_puntos_hoy(al, "Estudio", 5, "Estudio Excelente")
-            st.toast(f"🎉 ¡+5 Puntos asignados a {al}!", icon="✅")
-        if cb2.button("⚠️ +2 Puntos", key=f"est_o_{al}"):
-            set_puntos_hoy(al, "Estudio", 2, "Estudio Regular")
-            st.toast(f"⚠️ ¡+2 Puntos asignados a {al}!", icon="⚠️")
-        if cb3.button("❌ 0 Puntos", key=f"est_r_{al}"):
-            set_puntos_hoy(al, "Estudio", 0, "No aprovechado")
-            st.toast(f"🛑 0 Puntos anotados a {al}", icon="❌")
-        st.markdown("<hr style='border:1px dashed #ccc;' />", unsafe_allow_html=True)
+        pts_actuales = get_puntos_hoy(al, "Estudio", None)
+        index_def = list(opciones_estudio.values()).index(pts_actuales)
+        st.markdown(f"**🧑 {al}**")
+        seleccion = st.radio(f"Est_{al}", options=list(opciones_estudio.keys()), index=index_def, key=f"rad_est_{al}", horizontal=True, label_visibility="collapsed")
+        pts_seleccionados = opciones_estudio[seleccion]
+        if pts_seleccionados is not None and pts_seleccionados != pts_actuales:
+            set_puntos_hoy(al, "Estudio", pts_seleccionados, "Evaluación de estudio")
+            st.toast(f"✅ {al} actualizado", icon="📝")
+        st.markdown("<div style='border-bottom:1px solid #f1f5f9; margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
 # --- PANTALLA: ORACIONES ---
 elif st.session_state.menu_actual == "🙏 Oraciones":
@@ -266,102 +304,88 @@ elif st.session_state.menu_actual == "🙏 Oraciones":
         {"nombre": "🟠 SEMANA 4", "items": LISTA_ORACIONES[15:20], "color": "#ffb7b2"}
     ]
     for b in bloques_semanales:
-        st.markdown(f'<div style="background-color:{b["color"]}; padding:8px; border-radius:4px; font-weight:bold; margin-top:10px;">{b["nombre"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background-color:{b["color"]}; padding:4px; border-radius:4px; font-weight:bold; margin-top:4px; font-size:11px; color:#333;">{b["nombre"]}</div>', unsafe_allow_html=True)
         for item in b["items"]:
-            if st.checkbox(item, value=(item in oraciones_actuales), key=f"or_mob_{al_sel}_{item}"): nuevas_oraciones.append(item)
+            if st.checkbox(item, value=(item in oraciones_actuales), key=f"or_m_{al_sel}_{item}"): nuevas_oraciones.append(item)
     if nuevas_oraciones != oraciones_actuales:
         st.session_state.oraciones_aprendidas[al_sel] = nuevas_oraciones
         st.session_state.historico_puntos = st.session_state.historico_puntos[~((st.session_state.historico_puntos['Alumno'] == al_sel) & (st.session_state.historico_puntos['Actividad'] == "Oración"))]
         for o in nuevas_oraciones: set_puntos_hoy(al_sel, "Oración", 5, f"Sabe: {o}")
-        st.success("Cambios en oraciones guardados.")
+        st.rerun()
 
 # --- PANTALLA: DEPORTE ---
 elif st.session_state.menu_actual == "⚽ Deporte":
     st.subheader("⚽ Gestión de Deporte del Día")
-    modalidad = st.radio("Selecciona el formato de la competición de hoy:", ["👥 Por Equipos (Por defecto)", "🎾 Por Parejas (Dobles Tenis/Pádel)", "🏃 Individual (Carreras / Atletismo)"])
-    
-    if "Equipos" in modalidad:
-        num_equipos = st.slider("¿Cuántos equipos compiten?", 2, 4, 2)
-        nombres_base = ["Alfa", "Beta", "Gamma", "Delta"][:num_equipos]
-        for eq in nombres_base:
-            if f"m_dep_{eq}" not in st.session_state: st.session_state[f"m_dep_{eq}"] = []
-            if f"c_dep_{eq}" not in st.session_state: st.session_state[f"c_dep_{eq}"] = ""
-        for eq in nombres_base:
-            st.markdown(f"##### Equipo {eq}")
-            st.session_state[f"c_dep_{eq}"] = st.selectbox(f"👑 Capitán de {eq}:", [""] + alumnos_activos, key=f"cap_sel_{eq}")
-            st.session_state[f"m_dep_{eq}"] = st.multiselect(f"Jugadores de {eq}:", [al for al in alumnos_activos if al != st.session_state[f"c_dep_{eq}"]], key=f"jug_sel_{eq}")
-        st.markdown("---")
-        mapa_pts = {5: "1º Lugar (5 Pts)", 3: "2º Lugar (3 Pts)", 2: "3º Lugar (2 Pts)", 0: "4º Lugar (0 Pts)"}
-        res = {eq: st.selectbox(f"Posición de Equipo {eq}:", [5, 3, 2, 0], format_func=lambda x: mapa_pts[x], key=f"res_eq_{eq}") for eq in nombres_base}
-        if st.button("💾 Guardar Torneo por Equipos"):
+    is_cancelled = str(fecha_hoy) in st.session_state.dates_no_deporte
+    t_toggle = "🟢 DEPORTE ACTIVO (Pulsar para suspender)" if not is_cancelled else "🚫 HOY NO HAY DEPORTE (Puntos anulados)"
+    if st.button(t_toggle, key="toggle_dep_day"):
+        if is_cancelled: st.session_state.dates_no_deporte.remove(str(fecha_hoy))
+        else: st.session_state.dates_no_deporte.add(str(fecha_hoy))
+        guardar_datos_locales(); st.rerun()
+    if not is_cancelled:
+        modalidad = st.radio("Formato de hoy:", ["👥 Por Equipos", "🎾 Por Parejas (Dobles)", "🏃 Individual"], label_visibility="collapsed")
+        if "Equipos" in modalidad:
+            num_equipos = st.slider("Equipos:", 2, 4, 2)
+            nombres_base = ["Alfa", "Beta", "Gamma", "Delta"][:num_equipos]
             for eq in nombres_base:
-                pts = res[eq]
-                if st.session_state[f"c_dep_{eq}"]: set_puntos_hoy(st.session_state[f"c_dep_{eq}"], "Deporte", pts, f"Capitán de {eq}")
-                for j in st.session_state[f"m_dep_{eq}"]: set_puntos_hoy(j, "Deporte", pts, f"Miembro de {eq}")
-            st.success("Puntos de equipo guardados.")
-            
-    elif "Parejas" in modalidad:
-        p1 = st.multiselect("Pareja A:", alumnos_activos, max_selections=2, key="par_a")
-        p2 = st.multiselect("Pareja B:", [al for al in alumnos_activos if al not in p1], max_selections=2, key="par_b")
-        pts_pa = st.selectbox("Puntos Pareja A:", [5, 3, 2, 0], key="pts_pa")
-        pts_pb = st.selectbox("Puntos Pareja B:", [5, 3, 2, 0], key="pts_pb")
-        if st.button("💾 Registrar Puntos de Parejas"):
-            for al in p1: set_puntos_hoy(al, "Deporte", pts_pa, "Torneo Parejas A")
-            for al in p2: set_puntos_hoy(al, "Deporte", pts_pb, "Torneo Parejas B")
-            st.success("Puntos de dobles guardados.")
-            
-    elif "Individual" in modalidad:
-        al_ganador = st.selectbox("1º Clasificado (+5 Pts):", alumnos_activos, key="ind_1")
-        al_2do = st.selectbox("2º Clasificado (+3 Pts):", [al for al in alumnos_activos if al != al_ganador], key="ind_2")
-        al_3ro = st.selectbox("3º Clasificado (+2 Pts):", [al for al in alumnos_activos if al not in [al_ganador, al_2do]], key="ind_3")
-        if st.button("💾 Registrar Deporte Individual"):
-            set_puntos_hoy(al_ganador, "Deporte", 5, "1º Lugar Individual")
-            set_puntos_hoy(al_2do, "Deporte", 3, "2º Lugar Individual")
-            set_puntos_hoy(al_3ro, "Deporte", 2, "3º Lugar Individual")
-            st.success("Puntos individuales guardados.")
+                st.markdown(f"##### Equipo {eq}")
+                st.session_state[f"c_dep_{eq}"] = st.selectbox(f"👑 Capitán de {eq}:", [""] + alumnos_activos, key=f"c_{eq}")
+                st.session_state[f"m_dep_{eq}"] = st.multiselect(f"Jugadores {eq}:", [al for al in alumnos_activos if al != st.session_state[f"c_dep_{eq}"]], key=f"j_{eq}")
+            mapa_pts = {5: "1º Lugar (5 Pts)", 3: "2º Lugar (3 Pts)", 2: "3º Lugar (2 Pts)", 0: "4º Lugar (0 Pts)"}
+            res = {eq: st.selectbox(f"Posición {eq}:", [5, 3, 2, 0], format_func=lambda x: mapa_pts[x], key=f"r_eq_{eq}") for eq in nombres_base}
+            if st.button("💾 Registrar Torneo"):
+                for eq in nombres_base:
+                    pts = res[eq]
+                    if st.session_state[f"c_dep_{eq}"]: set_puntos_hoy(st.session_state[f"c_dep_{eq}"], "Deporte", pts, f"Capitán {eq}")
+                    for j in st.session_state[f"m_dep_{eq}"]: set_puntos_hoy(j, "Deporte", pts, f"Miembro {eq}")
+                st.success("Torneo guardado.")
 
-# --- PANTALLA: DEPORTIVIDAD (CORREGIDA) ---
+# --- PANTALLA: DEPORTIVIDAD ---
 elif st.session_state.menu_actual == "🙌 Deportividad":
-    st.header("🙌 Control de Deportividad")
-    for al in sorted(alumnos_activos):
-        st.markdown(f"### 🙌 {al}")
-        cb1, cb2, cb3 = st.columns(3)
-        # CORRECCIÓN: Eliminados los argumentos 'class_name'
-        if cb1.button("✅ Excelente (+5)", key=f"dep_g_{al}"):
-            set_puntos_hoy(al, "Deportividad", 5, "Deportividad Excelente")
-            st.toast(f"🙌 Deportividad de {al} fijada en 5 Pts", icon="🙌")
-        if cb2.button("⚠️ Quejas (+2)", key=f"dep_o_{al}"):
-            set_puntos_hoy(al, "Deportividad", 2, "Protestas leves")
-            st.toast(f"⚠️ Deportividad reducida a 2 Pts para {al}", icon="⚠️")
-        if cb3.button("❌ Grave (0)", key=f"dep_r_{al}"):
-            set_puntos_hoy(al, "Deportividad", 0, "Falta grave de respeto")
-            st.toast(f"🛑 0 Pts en Deportividad para {al}", icon="❌")
-        st.markdown("<hr style='border:1px dashed #ccc;' />", unsafe_allow_html=True)
+    st.subheader("🙌 Control de Deportividad")
+    is_cancelled_dep = str(fecha_hoy) in st.session_state.dates_no_deporte
+    if is_cancelled_dep:
+        st.warning("Deporte suspendido hoy. Los 5 puntos base están desactivados.")
+    else:
+        opciones_dep = {"✅ Excelente (5 Pts)": 5, "⚠️ Quejas/Faltas (2 Pts)": 2, "❌ Falta Grave (0 Pts)": 0}
+        for al in sorted(alumnos_activos):
+            st.markdown(f"**🙌 {al}**")
+            pts_act = get_puntos_hoy(al, "Deportividad", 5)
+            idx_def = list(opciones_dep.values()).index(pts_act)
+            sel = st.radio(f"Dep_{al}", options=list(opciones_dep.keys()), index=idx_def, key=f"rad_dep_{al}", label_visibility="collapsed")
+            if opciones_dep[sel] != pts_act:
+                set_puntos_hoy(al, "Deportividad", opciones_dep[sel], "Nota deportividad")
+                st.toast(f"🙌 {al} actualizado", icon="🙌")
+            st.markdown("<div style='border-bottom:1px solid #f1f5f9; margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
-# --- PANTALLA: TALLER (CORREGIDA) ---
+# --- PANTALLA: TALLER ---
 elif st.session_state.menu_actual == "🎨 Taller":
-    st.header("🎨 Trabajo en los Talleres")
-    for al in sorted(alumnos_activos):
-        st.markdown(f"### 🎨 {al}")
-        cb1, cb2, cb3 = st.columns(3)
-        # CORRECCIÓN: Eliminados los argumentos 'class_name'
-        if cb1.button("✅ Trabajador (+5)", key=f"tal_g_{al}"):
-            set_puntos_hoy(al, "Taller", 5, "Trabajo Completo")
-            st.toast(f"🎨 Taller de {al} -> 5 Pts", icon="🎨")
-        if cb2.button("⚠️ Distraído (+2)", key=f"tal_o_{al}"):
-            set_puntos_hoy(al, "Taller", 2, "Poco participativo")
-            st.toast(f"⚠️ Taller de {al} -> 2 Pts", icon="⚠️")
-        if cb3.button("❌ Malo (0)", key=f"tal_r_{al}"):
-            set_puntos_hoy(al, "Taller", 0, "Mal comportamiento en sala")
-            st.toast(f"🛑 Taller de {al} -> 0 Pts", icon="❌")
-        st.markdown("<hr style='border:1px dashed #ccc;' />", unsafe_allow_html=True)
+    st.subheader("🎨 Trabajo en los Talleres")
+    is_cancelled_tal = str(fecha_hoy) in st.session_state.dates_no_taller
+    t_toggle_tal = "🟢 TALLER ACTIVO (Pulsar para suspender)" if not is_cancelled_tal else "🚫 HOY NO HAY TALLER (Puntos anulados)"
+    if st.button(t_toggle_tal, key="toggle_tal_day"):
+        if is_cancelled_tal: st.session_state.dates_no_taller.remove(str(fecha_hoy))
+        else: st.session_state.dates_no_taller.add(str(fecha_hoy))
+        guardar_datos_locales(); st.rerun()
+    if is_cancelled_tal:
+        st.warning("Talleres suspendidos hoy. Se eliminan los 5 puntos base.")
+    else:
+        opciones_tal = {"✅ Trabajador (5 Pts)": 5, "⚠️ Distraído (2 Pts)": 2, "❌ Indisciplina (0 Pts)": 0}
+        for al in sorted(alumnos_activos):
+            st.markdown(f"**🎨 {al}**")
+            pts_act = get_puntos_hoy(al, "Taller", 5)
+            idx_def = list(opciones_tal.values()).index(pts_act)
+            sel = st.radio(f"Tal_{al}", options=list(opciones_tal.keys()), index=idx_def, key=f"rad_tal_{al}", label_visibility="collapsed")
+            if opciones_tal[sel] != pts_act:
+                set_puntos_hoy(al, "Taller", opciones_tal[sel], "Nota taller")
+                st.toast(f"🎨 {al} actualizado", icon="🎨")
+            st.markdown("<div style='border-bottom:1px solid #f1f5f9; margin-bottom:4px;'></div>", unsafe_allow_html=True)
 
 # --- PANTALLA: ENCARGOS ---
 elif st.session_state.menu_actual == "🧹 Encargos":
-    st.header("🧹 Distribución de Encargos Oficiales")
+    st.subheader("🧹 Distribución de Encargos")
     tab_f, tab_t = st.tabs(["📌 Tareas Fijas", "🙏 Estar de Turno"])
     if semana_act not in st.session_state.encargos_semanales: st.session_state.encargos_semanales[semana_act] = {e: [] for e in LISTA_ENCARGOS_OFICIALES}
-    
     with tab_f:
         for enc in LISTA_ENCARGOS_OFICIALES:
             ocupados = []
@@ -382,7 +406,6 @@ elif st.session_state.menu_actual == "🧹 Encargos":
                     idx_e = list(op_e.values()).index(pts_a) if pts_a in op_e.values() else 0
                     sel_e = c_r.radio(f"r_{enc}_{nino}", list(op_e.keys()), index=idx_e, key=f"rd_{enc}_{nino}", label_visibility="collapsed")
                     if op_e[sel_e] != pts_a: set_puntos_hoy(nino, f"Encargo_{enc}", op_e[sel_e], f"Hizo {enc}")
-
     with tab_t:
         dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
         for d in dias:
@@ -390,23 +413,14 @@ elif st.session_state.menu_actual == "🧹 Encargos":
             def_t = st.session_state.estar_de_turno[semana_act].get(d, "")
             idx_t = alumnos_activos.index(def_t) + 1 if def_t in alumnos_activos else 0
             sel_t = st.selectbox(f"Encargado del {d}:", ["--- Sin asignar ---"] + alumnos_activos, index=idx_t, key=f"t_or_{d}")
-            if sel_t != def_t:
-                st.session_state.estar_de_turno[semana_act][d] = sel_t if sel_t != "--- Sin asignar ---" else ""
-                guardar_datos_locales()
+            if sel_t != def_t: st.session_state.estar_de_turno[semana_act][d] = sel_t if sel_t != "--- Sin asignar ---" else ""; guardar_datos_locales()
 
 # --- PANTALLA: LIMPIEZA COMEDOR ---
 elif st.session_state.menu_actual == "🍽️ Comedor":
-    st.header("🍽️ Tareas de Limpieza (10 Puntos)")
+    st.subheader("🍽️ Tareas de Limpieza (10 Puntos)")
     if st.button("🤖 Calcular Sugerencia Justa del Día"):
         al_ordenados = sorted(alumnos_activos, key=lambda x: st.session_state.contador_comedor.get(x, 0))
-        st.session_state.limpieza_propuesta = {
-            "Fregar Vasos y Cubiertos (2)": [al_ordenados[0], al_ordenados[1]],
-            "Barrer Comedor (2)": [al_ordenados[2], al_ordenados[3]],
-            "Pasar Bayetas por Mesas (2)": [al_ordenados[4], al_ordenados[5]],
-            "Basura Envases (1)": [al_ordenados[6]],
-            "Basura Orgánico (1)": [al_ordenados[7]],
-            "Basura Papel y Cartón (1)": [al_ordenados[8]]
-        }
+        st.session_state.limpieza_propuesta = {"Fregar Vasos y Cubiertos (2)": [al_ordenados[0], al_ordenados[1]], "Barrer Comedor (2)": [al_ordenados[2], al_ordenados[3]], "Pasar Bayetas por Mesas (2)": [al_ordenados[4], al_ordenados[5]], "Basura Envases (1)": [al_ordenados[6]], "Basura Orgánico (1)": [al_ordenados[7]], "Basura Papel y Cartón (1)": [al_ordenados[8]]}
     if "limpieza_propuesta" in st.session_state:
         roles_f = {}
         for rol, sugeridos in st.session_state.limpieza_propuesta.items():
@@ -419,17 +433,18 @@ elif st.session_state.menu_actual == "🍽️ Comedor":
                     st.session_state.contador_comedor[el] += 1
             st.success("¡Cuadrante guardado!")
 
-# --- PANTALLA: EXTRAS ---
+# --- PANTALLA: EXTRAS EN VIVO ---
 elif st.session_state.menu_actual == "💪 Extras":
-    st.header("💪 Marcador de Encargos Extra en Vivo")
-    motivo_live = st.text_input("Trabajo Extra Actual:", "Ayudar a ordenar el pabellón")
-    st.markdown("---")
+    st.subheader("💪 Marcador de Encargos Extra")
+    motivo_live = st.text_input("Trabajo Extra Actual:", "Ayudar a ordenar materiales")
     for al in sorted(alumnos_activos):
         c_name, c_btn = st.columns([3, 1])
         c_name.write(f"🏃 **{al}**")
-        if c_btn.button(f"➕ 1 Pt Extra", key=f"b_ex_v_{al}"):
-            set_puntos_hoy(al, "Extra", 1, motivo_live)
-            st.toast(f"💪 +1 Punto Extra añadido a {al} por '{motivo_live}'", icon="💪")
+        if c_btn.button(f"➕ 1 Pt", key=f"b_ex_v_{al}"):
+            nueva_f = pd.DataFrame([{'Fecha': str(fecha_hoy), 'Alumno': al, 'Actividad': "Extra", 'Puntos': 1, 'Detalle': motivo_live, 'Semana': semana_act}])
+            st.session_state.historico_puntos = pd.concat([st.session_state.historico_puntos, nueva_f], ignore_index=True)
+            guardar_datos_locales()
+            st.toast(f"💪 +1 Pt Extra a {al}", icon="💪")
             st.rerun()
     st.markdown("---")
     st.subheader("🔍 Historial de Extras Añadidos Hoy")
@@ -439,7 +454,7 @@ elif st.session_state.menu_actual == "💪 Extras":
 
 # --- PANTALLA: JUEGOS ---
 elif st.session_state.menu_actual == "🧠 Juegos":
-    st.header("🧠 Puntuación de Juegos del Día")
+    st.subheader("🧠 Puntuación de Juegos del Día")
     nombres_j = ["Alfa", "Beta", "Gamma", "Delta"]
     mapa_j = {5: "5 Puntos", 3: "3 Puntos", 2: "2 Puntos", 0: "0 Puntos"}
     motivo_juego = st.text_input("Nombre del juego de hoy:", "Gran Gymkhana")
@@ -456,68 +471,56 @@ elif st.session_state.menu_actual == "🧠 Juegos":
 
 # --- PANTALLA: VÍDEO FORMACIÓN ---
 elif st.session_state.menu_actual == "🎥 Vídeo":
-    st.header("🎥 Preguntas del Vídeo de Formación (2 Pts por Acierto)")
+    st.subheader("🎥 Preguntas del Vídeo (2 Pts)")
     if 'vid_preg_num' not in st.session_state: st.session_state.vid_preg_num = 1
     conteo_v = {al: len(st.session_state.historico_puntos[(st.session_state.historico_puntos['Alumno'] == al) & (st.session_state.historico_puntos['Actividad'] == "Video Formación")]) if not st.session_state.historico_puntos.empty else 0 for al in alumnos_activos}
-
     if st.button("🔄 Generar / Congelar Fila del Día"):
         st.session_state.fixed_queue = sorted(alumnos_activos, key=lambda x: conteo_v[x])
         st.session_state.vid_pointer = 0
-        st.success("¡Fila fijada correctamente!")
-
+        st.success("¡Fila fijada!")
     if 'fixed_queue' not in st.session_state:
         st.session_state.fixed_queue = sorted(alumnos_activos, key=lambda x: conteo_v[x])
         st.session_state.vid_pointer = 0
-
     cola_fija = st.session_state.fixed_queue
     total_cola = len(cola_fija)
     p = st.session_state.vid_pointer
     if p >= total_cola: p = 0; st.session_state.vid_pointer = 0
-    
-    st.subheader(f"❓ Pregunta Actual N° {st.session_state.vid_preg_num}")
+    st.write(f"❓ **Pregunta N° {st.session_state.vid_preg_num}**")
     titular = cola_fija[p] if total_cola > 0 else "Nadie"
-    st.info(f"🎯 **Pregunta dirigida a:** {titular}")
-    
+    st.info(f"🎯 **Pregunta para:** {titular}")
     c_t1, c_t2 = st.columns([3, 1])
     c_t1.write(f"🔹 Principal: **{titular}**")
-    if c_t2.button("✅ Acertó Principal (+2 Pts)", key="v_tit_b"):
+    if c_t2.button("✅ Acertó", key="v_tit_b"):
         set_puntos_hoy(titular, "Video Formación", 2, f"Pregunta {st.session_state.vid_preg_num}")
         st.session_state.vid_pointer = (cola_fija.index(titular) + 1) % total_cola
         st.session_state.vid_preg_num += 1
         st.rerun()
-        
     st.markdown("---")
-    st.write("**Cadena de Rebotes:**")
     for idx in range(1, 6):
         if total_cola > idx:
             reb_alumno = cola_fija[(p + idx) % total_cola]
             cr_n, cr_b = st.columns([3, 1])
             cr_n.write(f"↪️ Rebote {idx}: {reb_alumno}")
-            if cr_b.button(f"💥 Acertó Rebote {idx} (+2)", key=f"v_r_b_{idx}"):
-                set_puntos_hoy(reb_alumno, "Video Formación", 2, f"Pregunta {st.session_state.vid_preg_num} - Rebote {idx}")
+            if cr_b.button(f"💥 Acertó Rebote {idx}", key=f"v_r_b_{idx}"):
+                set_puntos_hoy(reb_alumno, "Video Formación", 2, f"Preg {st.session_state.vid_preg_num} - Reb {idx}")
                 st.session_state.vid_pointer = (cola_fija.index(reb_alumno) + 1) % total_cola
                 st.session_state.vid_preg_num += 1
                 st.rerun()
-                
-    if st.button("⏭️ Saltar Pregunta (Nadie sumó)"):
-        st.session_state.vid_pointer = (st.session_state.vid_pointer + 1) % total_cola
-        st.session_state.vid_preg_num += 1
-        st.rerun()
+    if st.button("⏭️ Saltar Pregunta"): st.session_state.vid_pointer = (st.session_state.vid_pointer + 1) % total_cola; st.session_state.vid_preg_num += 1; st.rerun()
 
 # --- PANTALLA: MULTAS ---
 elif st.session_state.menu_actual == "⚠️ Multas":
-    st.header("⚠️ Registro de Penalizaciones Especiales")
+    st.subheader("⚠️ Registro de Penalizaciones Especiales")
     ninos_a_penalizar = st.multiselect("Selecciona los alumnos implicados:", sorted(alumnos_activos))
-    motivo_p = st.text_input("Motivo de la infracción:", placeholder="Estar de pie gritando")
-    
+    motivo_p = st.text_input("Motivo de la infracción:", placeholder="Ej. Hablar alto o levantarse")
+    st.write("Elige los puntos a restar (Se guardará al hacer clic):")
     c1, c2, c3, c4, c5 = st.columns(5)
     puntos_a_quitar = None
-    if c1.button("📉 -1 Pt"): puntos_a_quitar = -1
-    if c2.button("📉 -2 Pts"): puntos_a_quitar = -2
-    if c3.button("📉 -3 Pts"): puntos_a_quitar = -3
-    if c4.button("📉 -4 Pts"): puntos_a_quitar = -4
-    if c5.button("📉 -5 Pts"): puntos_a_quitar = -5
-        
+    if c1.button("📉 -1"): puntos_a_quitar = -1
+    if c2.button("📉 -2"): puntos_a_quitar = -2
+    if c3.button("📉 -3"): puntos_a_quitar = -3
+    if c4.button("📉 -4"): puntos_a_quitar = -4
+    if c5.button("📉 -5"): puntos_a_quitar = -5
     if puntos_a_quitar is not None and ninos_a_penalizar and motivo_p:
         for al_p in ninos_a_penalizar:
             nueva_fila = pd.DataFrame([{'Fecha': str(fecha_hoy), 'Alumno': al_p, 'Actividad': "Penalizacion", 'Puntos': puntos_a_quitar, 'Detalle': motivo_p, 'Semana': semana_act}])
@@ -529,14 +532,13 @@ elif st.session_state.menu_actual == "⚠️ Multas":
     st.subheader("🔍 Historial de Penalizaciones de Hoy")
     if not st.session_state.historico_puntos.empty:
         df_pen_hoy = st.session_state.historico_puntos[(st.session_state.historico_puntos['Fecha'].astype(str) == str(fecha_hoy)) & (st.session_state.historico_puntos['Actividad'] == "Penalizacion")]
-        st.dataframe(df_pen_hoy[['Alumno', 'Puntos', 'Detalle']], width='stretch')
+        if not df_pen_hoy.empty: st.dataframe(df_pen_hoy[['Alumno', 'Puntos', 'Detalle']], width='stretch')
 
-# --- PANTALLA: ADMIN ---
+# --- PANTALLA: ADMIN (MÓDULO LIMPIO SIN TEXTOS ROTOS) ---
 elif st.session_state.menu_actual == "🛠️ Admin":
-    st.header("🛠️ Configuración e Inicialización")
+    st.subheader("🛠️ Panel de Administración")
     st.subheader("🚨 Eliminar Alumno de los Registros")
     alumno_a_borrar = st.selectbox("Selecciona el alumno a eliminar:", ["--- Selecciona ---"] + sorted(st.session_state.alumnos_master))
-    
     if st.button("❌ Eliminar Alumno Definitivamente", type="primary"):
         if alumno_a_borrar != "--- Selecciona ---":
             st.session_state.alumnos_master.remove(alumno_a_borrar)
@@ -545,29 +547,18 @@ elif st.session_state.menu_actual == "🛠️ Admin":
             for s in st.session_state.asistencia:
                 if alumno_a_borrar in st.session_state.asistencia[s]: del st.session_state.asistencia[s][alumno_a_borrar]
             guardar_datos_locales()
-            st.toast(f"🔥 {alumno_a_borrar} ha sido eliminado del sistema", icon="🗑️")
+            st.toast(f"🗑️ Eliminado: {alumno_a_borrar}")
             st.rerun()
-            
     st.markdown("---")
-    st.subheader("📥 Carga de Puntos a Granel (Histórico de Semana 1)")
+    st.subheader("📥 Carga a Granel (Semana 1)")
     with st.form("form_granel"):
-        alumno_g = st.selectbox("Selecciona al Alumno:", sorted(st.session_state.alumnos_master))
-        puntos_g = st.number_input("Puntos Totales Acumulados:", min_value=0, max_value=500, value=0)
-        motivo_g = st.text_input("Origen o motivo del volcado:", "Volcado masivo Excel Semana 1 de pruebas")
-        if st.form_submit_button("🚀 Inyectar Puntos a Granel"):
+        alumno_g = st.selectbox("Alumno:", sorted(st.session_state.alumnos_master))
+        puntos_g = st.number_input("Puntos:", min_value=0, max_value=500, value=0)
+        motivo_g = st.text_input("Motivo:", "Volcado masivo Excel Semana 1")
+        if st.form_submit_button("🚀 Inyectar"):
             if puntos_g > 0:
                 nueva_fila = pd.DataFrame([{'Fecha': str(fecha_hoy), 'Alumno': alumno_g, 'Actividad': "Volcado Inicial", 'Puntos': puntos_g, 'Detalle': motivo_g, 'Semana': "Semana 1"}])
                 st.session_state.historico_puntos = pd.concat([st.session_state.historico_puntos, nueva_fila], ignore_index=True)
                 guardar_datos_locales()
-                st.success(f"¡Inyectados {puntos_g} puntos con éxito!")
-            else: st.error("Introduce una puntuación mayor que cero.")
-
-    st.markdown("---")
-    st.subheader("🆕 Alta de Alumnos Nuevos")
-    nuevo_nombre = st.text_input("Nombre completo del nuevo alumno:")
-    if st.button("➕ Dar de alta Alumno"):
-        if nuevo_nombre and nuevo_nombre not in st.session_state.alumnos_master:
-            st.session_state.alumnos_master.append(nuevo_nombre)
-            guardar_datos_locales()
-            st.success(f"¡{nuevo_nombre} dado de alta con éxito!")
-            st.rerun()
+                st.success("Puntos inyectados.")
+            else: st.error("Introduce una puntuación válida.")
