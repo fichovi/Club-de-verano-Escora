@@ -6,8 +6,9 @@ import json
 import os
 
 # --- 1. CONFIGURACIÓN DE PÁGINA (MARCA BLANCA MOBILE-FIRST) ---
+# Aquí se define el nombre de la pestaña del navegador y su emoji de icono de forma nativa
 st.set_page_config(
-    page_title="Control Club de Verano", 
+    page_title="Club de verano Escora", 
     page_icon="🏆", 
     layout="wide", 
     initial_sidebar_state="collapsed"
@@ -114,6 +115,8 @@ def guardar_datos_locales():
         json.dump(st.session_state.asistencia, f, ensure_ascii=False)
     with open("local_turno.json", "w", encoding="utf-8") as f:
         json.dump(st.session_state.estar_de_turno, f, ensure_ascii=False)
+    with open("local_perfiles.json", "w", encoding="utf-8") as f:
+        json.dump(st.session_state.perfiles_alumnos, f, ensure_ascii=False)
     with open("local_cancelaciones.json", "w", encoding="utf-8") as f:
         json.dump({"no_deporte": list(st.session_state.dates_no_deporte), "no_taller": list(st.session_state.dates_no_taller)}, f)
 
@@ -121,28 +124,36 @@ def cargar_datos_locales():
     if os.path.exists("local_alumnos_master.json"):
         with open("local_alumnos_master.json", "r", encoding="utf-8") as f: st.session_state.alumnos_master = json.load(f)
     else: st.session_state.alumnos_master = LISTA_ALUM_INICIAL.copy()
+    
     if os.path.exists("local_historico_puntos.csv"):
         st.session_state.historico_puntos = pd.read_csv("local_historico_puntos.csv")
     else:
         st.session_state.historico_puntos = pd.DataFrame(columns=['Fecha', 'Hora', 'Alumno', 'Actividad', 'Puntos', 'Detalle', 'Semana'])
+        
     if os.path.exists("local_oraciones.json"):
         with open("local_oraciones.json", "r", encoding="utf-8") as f: st.session_state.oraciones_aprendidas = json.load(f)
     else: st.session_state.oraciones_aprendidas = {al: [] for al in st.session_state.alumnos_master}
+    
     if os.path.exists("local_comedor.json"):
         with open("local_comedor.json", "r", encoding="utf-8") as f: st.session_state.contador_comedor = json.load(f)
     else: st.session_state.contador_comedor = {al: 0 for al in st.session_state.alumnos_master}
+    
     if os.path.exists("local_encargos.json"):
         with open("local_encargos.json", "r", encoding="utf-8") as f: st.session_state.encargos_semanales = json.load(f)
-    else:
-        st.session_state.encargos_semanales = {f"Semana {i}": {} for i in range(1, 5)}
+    else: st.session_state.encargos_semanales = {f"Semana {i}": {} for i in range(1, 5)}
+    
     if os.path.exists("local_asistencia.json"):
         with open("local_asistencia.json", "r", encoding="utf-8") as f: st.session_state.asistencia = json.load(f)
-    else:
-        st.session_state.asistencia = {f"Semana {i}": {al: True for al in st.session_state.alumnos_master} for i in range(1, 5)}
+    else: st.session_state.asistencia = {f"Semana {i}": {al: True for al in st.session_state.alumnos_master} for i in range(1, 5)}
+    
     if os.path.exists("local_turno.json"):
         with open("local_turno.json", "r", encoding="utf-8") as f: st.session_state.estar_de_turno = json.load(f)
-    else:
-        st.session_state.estar_de_turno = {f"Semana {i}": {"Lunes": "", "Martes": "", "Miércoles": "", "Jueves": "", "Viernes": ""} for i in range(1, 5)}
+    else: st.session_state.estar_de_turno = {f"Semana {i}": {"Lunes": "", "Martes": "", "Miércoles": "", "Jueves": "", "Viernes": ""} for i in range(1, 5)}
+    
+    if os.path.exists("local_perfiles.json"):
+        with open("local_perfiles.json", "r", encoding="utf-8") as f: st.session_state.perfiles_alumnos = json.load(f)
+    else: st.session_state.perfiles_alumnos = {}
+    
     if os.path.exists("local_cancelaciones.json"):
         with open("local_cancelaciones.json", "r") as f:
             data = json.load(f)
@@ -155,7 +166,6 @@ def cargar_datos_locales():
 if 'alumnos_master' not in st.session_state:
     cargar_datos_locales()
 
-# Inicialización de seguridad absoluta de la pestaña para evitar el AttributeError
 if 'menu_actual' not in st.session_state: 
     st.session_state.menu_actual = "🏠 Inicio"
 
@@ -189,12 +199,9 @@ def get_puntos_hoy(alumno, actividad, default_val=None):
     if cond.any(): return df.loc[cond, 'Puntos'].values[0]
     return default_val
 
-# CORRECCIÓN DE MOTOR MAESTRA: Saneada la evaluación lógica para permitir entradas múltiples e independientes de extras y multas
 def registrar_puntos(alumno, actividad, puntos, detalle=""):
     df = st.session_state.historico_puntos
     hora_actual = datetime.now().strftime("%H:%M:%S")
-    
-    # Solo las actividades fijas diarias de una única casilla se sobrescriben
     actividades_fijas = (actividad in ["Estudio", "Deportividad", "Taller"]) or actividad.startswith("Encargo_")
     
     if actividades_fijas:
@@ -206,7 +213,6 @@ def registrar_puntos(alumno, actividad, puntos, detalle=""):
             guardar_datos_locales()
             return
             
-    # Las penalizaciones y extras se insertan SIEMPRE como líneas nuevas e ilimitadas independientes
     nueva_fila = pd.DataFrame([{'Fecha': str(fecha_hoy), 'Hora': hora_actual, 'Alumno': alumno, 'Actividad': actividad, 'Puntos': puntos, 'Detalle': detalle, 'Semana': semana_act}])
     st.session_state.historico_puntos = pd.concat([st.session_state.historico_puntos, nueva_fila], ignore_index=True)
     guardar_datos_locales()
@@ -239,18 +245,39 @@ if st.session_state.menu_actual == "🏠 Inicio":
             else:
                 st.markdown(f'<div style="background-color: #f3f4f6; border-left: 4px solid #9ca3af; padding: 4px; border-radius: 4px; margin-bottom: 2px; color:#6b7280; font-size:11px;">⏳ {c["inicio"]} - {c["fin"]}: {c["tarea"]}</div>', unsafe_allow_html=True)
 
-# --- PANTALLA: GESTIÓN DE ASISTENCIA ---
+# --- PANTALLA: GESTIÓN DE ASISTENCIA Y CONTACTOS ---
 elif st.session_state.menu_actual == "👥 Asist":
-    st.subheader("👥 Control de Asistencia Semanal")
-    if semana_act not in st.session_state.asistencia: st.session_state.asistencia[semana_act] = {}
-    for al in sorted(st.session_state.alumnos_master):
-        if al not in st.session_state.asistencia[semana_act]: st.session_state.asistencia[semana_act][al] = True
-        val_ch = st.checkbox(al, value=st.session_state.asistencia[semana_act][al], key=f"asist_tab_{al}")
-        if val_ch != st.session_state.asistencia[semana_act][al]:
-            st.session_state.asistencia[semana_act][al] = val_ch
-            guardar_datos_locales(); st.rerun()
+    st.subheader("👥 Control de Asistencia y Fichas")
+    
+    tab_asist, tab_fichas = st.tabs(["📌 Asistencia de la Semana", "📇 Fichas de Contacto Completo"])
+    
+    with tab_asist:
+        st.markdown(f"👦 **Total Asistentes:** `{len(alumnos_activos)} de {len(st.session_state.alumnos_master)}`")
+        if semana_act not in st.session_state.asistencia: st.session_state.asistencia[semana_act] = {}
+        for al in sorted(st.session_state.alumnos_master):
+            if al not in st.session_state.asistencia[semana_act]: st.session_state.asistencia[semana_act][al] = True
+            val_ch = st.checkbox(al, value=st.session_state.asistencia[semana_act][al], key=f"asist_tab_{al}")
+            if val_ch != st.session_state.asistencia[semana_act][al]:
+                st.session_state.asistencia[semana_act][al] = val_ch
+                guardar_datos_locales(); st.rerun()
+                
+    with tab_fichas:
+        st.markdown("### 📇 Consulta de Datos Familiares")
+        if st.session_state.perfiles_alumnos:
+            al_f = st.selectbox("Seleccionar Alumno para ver detalles:", sorted(st.session_state.alumnos_master), key="sb_fichas_view")
+            perfil = st.session_state.perfiles_alumnos.get(al_f, {})
+            if perfil:
+                st.markdown(f"**📞 Teléfono de Contacto:** {perfil.get('Telefono', 'No registrado')}")
+                st.markdown(f"**👨‍👩‍👦 Nombre de los Padres:** {perfil.get('Padres', 'No registrado')}")
+                st.markdown(f"**🏫 Colegio de Procedencia:** {perfil.get('Colegio', 'No registrado')}")
+                if 'Detalles Extra' in perfil:
+                    st.markdown(f"**📝 Notas Adicionales:** {perfil.get('Detalles Extra', '')}")
+            else:
+                st.info("Este alumno no tiene ficha detallada. Puedes cargarla mediante un Excel masivo en la pestaña Admin.")
+        else:
+            st.info("Aún no hay fichas registradas. Sube una hoja Excel en la pestaña Admin para sincronizarlas todas a la vez.")
 
-# --- PANTALLA: CLASIFICACIONES ---
+# --- PANTALLA: CLASIFICACIONES (MEJORA: CSV EN LAS 3 PESTAÑAS) ---
 elif st.session_state.menu_actual == "📊 Rank":
     st.subheader("📊 Resultados de Clasificación")
     tab_s, tab_g, tab_d = st.tabs(["📆 Semanal", "🏆 General", "📅 Puntos de Hoy"])
@@ -271,7 +298,7 @@ elif st.session_state.menu_actual == "📊 Rank":
             lista_ninos = alumnos_activos if filtrar_semana else st.session_state.alumnos_master
             for al in lista_ninos:
                 for f in fechas_evaluadas:
-                    sem_f = df_hist[df_hist['Fecha'] == f]['Semana'].values[0] if not df_hist.empty and f in df_hist['Fecha'].values else semana_act
+                    sem_f = df_hist[df_hist['Fecha'] == f]['Semana'].values[0] if not df_hist.empty and f in df_hist['Fecha'].values else  semana_act
                     if not st.session_state.asistencia.get(sem_f, {}).get(al, True): continue
                     if filtrar_semana and sem_f != filtrar_semana: continue
                     
@@ -288,6 +315,9 @@ elif st.session_state.menu_actual == "📊 Rank":
             fig_s = px.bar(df_s, x='Puntos', y='Alumno', color='Actividad', orientation='h', title=f"Estadísticas: {semana_act}")
             fig_s.update_layout(height=500, barmode='stack', xaxis=dict(fixedrange=True), yaxis=dict(fixedrange=True, categoryorder='total ascending'), margin=dict(l=0,r=0,t=25,b=0))
             st.plotly_chart(fig_s, width='stretch', config={'displayModeBar': False})
+            # MEJORA: Exportación CSV Semanal habilitada
+            csv_data_s = df_s.groupby(['Alumno', 'Actividad'])['Puntos'].sum().reset_index().to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Descargar CSV Semanal", data=csv_data_s, file_name=f"Desglose_Semanal_{semana_act}.csv", mime='text/csv')
             
     with tab_g:
         df_g = generar_tabla_desglosada(None)
@@ -295,6 +325,9 @@ elif st.session_state.menu_actual == "📊 Rank":
             fig_g = px.bar(df_g, x='Puntos', y='Alumno', color='Actividad', orientation='h', title="Estadísticas Acumuladas")
             fig_g.update_layout(height=600, barmode='stack', xaxis=dict(fixedrange=True), yaxis=dict(fixedrange=True, categoryorder='total ascending'), margin=dict(l=0,r=0,t=25,b=0))
             st.plotly_chart(fig_g, width='stretch', config={'displayModeBar': False})
+            # MEJORA: Exportación CSV General habilitada
+            csv_data_g = df_g.groupby(['Alumno', 'Actividad'])['Puntos'].sum().reset_index().to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Descargar CSV General", data=csv_data_g, file_name="Desglose_General_Campus.csv", mime='text/csv')
             
     with tab_d:
         df_d = generar_tabla_desglosada(None, filtrar_fecha=fecha_hoy)
@@ -303,6 +336,9 @@ elif st.session_state.menu_actual == "📊 Rank":
             fig_d = px.bar(df_d_sum, x='Puntos', y='Alumno', orientation='h', title=f"Puntos Ganados Hoy ({fecha_hoy})", text_auto=True)
             fig_d.update_layout(height=500, xaxis=dict(fixedrange=True), yaxis=dict(fixedrange=True))
             st.plotly_chart(fig_d, width='stretch', config={'displayModeBar': False})
+            # MEJORA: Exportación CSV del día de hoy habilitada
+            csv_data_d = df_d.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Descargar CSV de Puntos de Hoy", data=csv_data_d, file_name=f"Puntos_Hoy_{fecha_hoy}.csv", mime='text/csv')
         else:
             st.info("No hay registros de puntos anotados en la fecha de hoy.")
             
@@ -463,7 +499,7 @@ elif st.session_state.menu_actual == "🧹 Enc":
                     pts_a = get_puntos_hoy(nino, f"Encargo_{enc}", None)
                     idx_e = list(op_e.values()).index(pts_a) if pts_a in op_e.values() else 0
                     sel_e = st.radio(f"Nota para {nino}:", list(op_e.keys()), index=idx_e, key=f"rd_{enc}_{nino}")
-                    if op_e[sel_e] != pts_a: registrar_puntos(nino, f"Encargo_{enc}", op_e[sel_e], f"Hexo {enc}")
+                    if op_e[sel_e] != pts_a: registrar_puntos(nino, f"Encargo_{enc}", op_e[sel_e], f"Hizo {enc}")
 
     with tab_t:
         st.subheader("🙏 Fila para Rezar las Oraciones")
@@ -480,7 +516,7 @@ elif st.session_state.menu_actual == "🧹 Enc":
                 st.session_state.estar_de_turno[semana_act][d] = sel_t if sel_t != "--- Sin asignar ---" else ""
                 guardar_datos_locales()
 
-# --- PANTALLA: LIMPIEZA COMEDOR (MEJORA: EXCLUSIÓN MUTUA DE ALUMNOS EN TIEMPO REAL) ---
+# --- PANTALLA: LIMPIEZA COMEDOR ---
 elif st.session_state.menu_actual == "🍽️ Com":
     st.subheader("🍽️ Tareas de Limpieza (10 Puntos)")
     if st.button("🤖 Calcular Sugerencia Justa del Día"):
@@ -515,14 +551,13 @@ elif st.session_state.menu_actual == "🍽️ Com":
                     st.session_state.contador_comedor[el] += 1
             st.success("¡Cuadrante guardado con éxito!")
 
-# --- PANTALLA: EXTRAS (CORRECCIÓN TOTAL: SE PERMITEN PULSACIONES MÚLTIPLES) ---
+# --- PANTALLA: EXTRAS EN VIVO ACUMULATIVOS ---
 elif st.session_state.menu_actual == "💪 Ext":
     st.subheader("💪 Marcador de Encargos Extra")
     motivo_live = st.text_input("Trabajo Extra Actual:", "Ayudar a ordenar materiales")
     
     for al in sorted(alumnos_activos):
         st.markdown(f"🏃 **{al}**")
-        # Gracias a la corrección del motor principal, cada clic añade una transacción de +1 acumulativa limpia
         if st.button(f"➕ Añadir +1 Punto Extra", key=f"b_ex_v_{al}"):
             registrar_puntos(al, "Extra", 1, motivo_live)
             st.toast(f"💪 +1 Pt Extra cargado a {al}", icon="💪")
@@ -551,7 +586,7 @@ elif st.session_state.menu_actual == "🧠 Jue":
             for m in miembros_eq: registrar_puntos(m, "Juegos", pts_juego, f"Juego: {motivo_juego} ({eq})")
             st.success(f"Puntos asignados a {tag_j}")
 
-# --- PANTALLA: VÍDEO FORMACIÓN (MEJORA: AÑADIDO RANKING DE ACIERTOS COMPLETO ABAJO) ---
+# --- PANTALLA: VÍDEO FORMACIÓN ---
 elif st.session_state.menu_actual == "🎥 Vid":
     st.subheader("🎥 Preguntas del Vídeo (2 Pts)")
     if 'vid_preg_num' not in st.session_state: st.session_state.vid_preg_num = 1
@@ -610,19 +645,15 @@ elif st.session_state.menu_actual == "🎥 Vid":
             st.toast(f"🎥 +2 Pts a {al_libre}", icon="🎥")
             st.rerun()
             
-    # INSTALACIÓN SOLICITADA: Tabla de conteo de aciertos de vídeo acumulados por cada chaval
     st.markdown("---")
     st.subheader("📊 Conteo de Aciertos en Vídeo Formación")
     listado_aciertos_video = []
     for al in sorted(alumnos_activos):
-        listado_aciertos_video.append({
-            'Alumno': al,
-            'Preguntas Acertadas': conteo_v.get(al, 0)
-        })
+        listado_aciertos_video.append({'Alumno': al, 'Preguntas Acertadas': conteo_v.get(al, 0)})
     df_rank_video = pd.DataFrame(listado_aciertos_video).sort_values(by="Preguntas Acertadas", ascending=False)
     st.dataframe(df_rank_video, use_container_width=True, hide_index=True)
 
-# --- PANTALLA: MULTAS (CORRECCIÓN TOTAL: SE PERMITEN PULSACIONES MÚLTIPLES E HISTORIAL INDEPENDIENTE) ---
+# --- PANTALLA: MULTAS ---
 elif st.session_state.menu_actual == "⚠️ Mult":
     st.subheader("⚠️ Registro de Penalizaciones Especiales")
     ninos_a_penalizar = st.multiselect("Selecciona los alumnos implicados:", sorted(alumnos_activos))
@@ -639,7 +670,6 @@ elif st.session_state.menu_actual == "⚠️ Mult":
     
     if puntos_a_quitar is not None and ninos_a_penalizar and motivo_p:
         for al_p in ninos_a_penalizar:
-            # Ahora la app añade líneas correlativas ilimitadas sin machacar las multas previas
             registrar_puntos(al_p, "Penalizacion", puntos_a_quitar, motivo_p)
             st.toast(f"📉 Penalización aplicada a {al_p}", icon="⚠️")
         st.rerun()
@@ -651,10 +681,50 @@ elif st.session_state.menu_actual == "⚠️ Mult":
         if not df_pen_hoy.empty: 
             st.dataframe(df_pen_hoy[['Alumno', 'Puntos', 'Detalle']], width='stretch')
 
-# --- PANTALLA: ADMIN ---
+# --- PANTALLA: ADMIN (MEJORA: ALTA MASIVA CON EXCEL / FICHA COMPLETA) ---
 elif st.session_state.menu_actual == "🛠️ Admin":
     st.subheader("🛠️ Panel de Administración")
     
+    # MEJORA: Módulo de inscripción masiva y perfiles extendidos desde Excel
+    st.markdown("### 📥 Inscripción Masiva y Carga de Fichas Familiares")
+    st.caption("Sube un archivo Excel (.xlsx / .xls) con las columnas: Nombre, Telefono, Padres, Colegio")
+    excel_file = st.file_uploader("Seleccionar Excel de Alumnos:", type=["xlsx", "xls"], key="excel_masivo_uploader")
+    
+    if excel_file is not None:
+        try:
+            df_inscritos = pd.read_excel(excel_file)
+            # Normalizar columnas para evitar fallos por mayúsculas o acentos
+            df_inscritos.columns = df_inscritos.columns.astype(str).str.strip().str.capitalize()
+            
+            # Buscar columna con los nombres
+            col_nombre = [c for c in df_inscritos.columns if "Nom" in c or "Alum" in c]
+            if col_nombre:
+                c_nom = col_nombre[0]
+                conteo_nuevos = 0
+                for _, fila in df_inscritos.iterrows():
+                    nombre_completo = str(fila[c_nom]).strip()
+                    if nombre_completo and nombre_completo != "nan":
+                        # Añadir a la lista master si no existe
+                        if nombre_completo not in st.session_state.alumnos_master:
+                            st.session_state.alumnos_master.append(nombre_completo)
+                            conteo_nuevos += 1
+                        
+                        # Guardar perfil extendido (Ficha de contacto)
+                        st.session_state.perfiles_alumnos[nombre_completo] = {
+                            "Telefono": str(fila.get("Telefono", "No registrado")).replace(".0", ""),
+                            "Padres": str(fila.get("Padres", "No registrado")),
+                            "Colegio": str(fila.get("Colegio", "No registrado")),
+                            "Detalles Extra": str(fila.get("Notas", "")) if "Notas" in df_inscritos.columns else ""
+                        }
+                guardar_datos_locales()
+                st.success(f"¡Procesado con éxito! Se han dado de alta `{conteo_nuevos}` alumnos nuevos y sincronizado `{len(df_inscritos)}` fichas de contacto.")
+                st.rerun()
+            else:
+                st.error("Error: No se encontró ninguna columna que contenga los nombres de los alumnos en el Excel (Debe llamarse 'Nombre' o similar).")
+        except Exception as e:
+            st.error(f"Error procesando el archivo: {str(e)}")
+            
+    st.markdown("---")
     st.markdown("### 🖼️ Cargar Imagen de Horario del Campus")
     archivo_imagen = st.file_uploader("Seleccionar imagen de horario:", type=["png", "jpg", "jpeg"], key="upload_admin_horario")
     if archivo_imagen is not None:
@@ -671,6 +741,7 @@ elif st.session_state.menu_actual == "🛠️ Admin":
             st.session_state.alumnos_master.remove(alumno_a_borrar)
             if alumno_a_borrar in st.session_state.oraciones_aprendidas: del st.session_state.oraciones_aprendidas[alumno_a_borrar]
             if alumno_a_borrar in st.session_state.contador_comedor: del st.session_state.contador_comedor[alumno_a_borrar]
+            if alumno_a_borrar in st.session_state.perfiles_alumnos: del st.session_state.perfiles_alumnos[alumno_a_borrar]
             for s in st.session_state.asistencia:
                 if alumno_a_borrar in st.session_state.asistencia[s]: del st.session_state.asistencia[s][alumno_a_borrar]
             guardar_datos_locales()
