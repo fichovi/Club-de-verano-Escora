@@ -5,7 +5,7 @@ from datetime import date, datetime
 import json
 import os
 
-# --- 1. CONFIGURACIÓN DE PÁGINA (MARCA BLANCA PERSONALIZABLE) ---
+# --- 1. CONFIGURACIÓN DE PÁGINA (MARCA BLANCA MOBILE-FIRST) ---
 st.set_page_config(
     page_title="Club Escora Panel", 
     page_icon="🏆", 
@@ -16,24 +16,24 @@ st.set_page_config(
 # --- 2. INYECCIÓN DE CSS MAESTRO (DISEÑO ULTRA-COMPACTO ADAPTADO A MÓVILES) ---
 st.markdown("""
     <style>
-        /* Ocultar interfaces oficiales de Streamlit y GitHub */
+        /* Ocultar menús nativos y logos de Streamlit / GitHub */
         header {visibility: hidden !important;}
         footer {visibility: hidden !important;}
         div[data-testid="stDecoration"] {display: none !important;}
         div[data-testid="stSidebar"] {display: none !important;}
         
-        /* Reducir drásticamente fuentes para evitar saltos de línea molestos */
+        /* Reducir drásticamente tamaños de letra de títulos para pantallas móviles */
         h1 { font-size: 1.1rem !important; margin-bottom: 2px !important; padding-top: 0px !important; font-weight: bold; }
         h2 { font-size: 0.95rem !important; margin-bottom: 2px !important; font-weight: bold; }
         h3 { font-size: 0.85rem !important; margin-bottom: 2px !important; font-weight: bold; }
         p, span, label, .stMarkdown { font-size: 0.78rem !important; }
         
-        /* Compactación máxima de espacios y márgenes para ganar espacio táctil */
+        /* Eliminar márgenes y paddings excesivos para pegar el contenido */
         .block-container { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
         .element-container { margin-bottom: 0.15rem !important; }
         div[data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
         
-        /* Barra de navegación superior (Botonera unificada sin espacios intermedios) */
+        /* Barra de navegación superior (Elementos súper pegados y deslizables) */
         div[data-testid="element-container"]:has(#nav-marker) + div[data-testid="element-container"] div[role="radiogroup"] {
             overflow-x: auto !important;
             flex-wrap: nowrap !important;
@@ -131,7 +131,8 @@ def cargar_datos_locales():
     else: st.session_state.contador_comedor = {al: 0 for al in st.session_state.alumnos_master}
     if os.path.exists("local_encargos.json"):
         with open("local_encargos.json", "r", encoding="utf-8") as f: st.session_state.encargos_semanales = json.load(f)
-    else: st.session_state.encargos_semanales = {f"Semana {i}": {} for i in range(1, 5)}
+    else:
+        st.session_state.encargos_semanales = {f"Semana {i}": {} for i in range(1, 5)}
     if os.path.exists("local_asistencia.json"):
         with open("local_asistencia.json", "r", encoding="utf-8") as f: st.session_state.asistencia = json.load(f)
     else:
@@ -214,7 +215,7 @@ if st.session_state.menu_actual == "🏠 Inicio":
     if os.path.exists(ruta_horario_imagen):
         st.image(ruta_horario_imagen, caption=f"Horario Oficial Subido para la {semana_act}", use_container_width=True)
     else:
-        st.info("💡 No hay ninguna imagen de horario cargada para esta semana. Mostrando horario predeterminado:")
+        st.info("💡 No hay ninguna imagen de horario cargada para esta semana. Mostrando horario de texto predeterminado:")
         hora_ahora = datetime.now().time()
         nombre_dia_eng = fecha_hoy.strftime("%A")
         horarios_oficiales = {
@@ -233,10 +234,10 @@ if st.session_state.menu_actual == "🏠 Inicio":
             else:
                 st.markdown(f'<div style="background-color: #f3f4f6; border-left: 4px solid #9ca3af; padding: 4px; border-radius: 4px; margin-bottom: 2px; color:#6b7280; font-size:11px;">⏳ {c["inicio"]} - {c["fin"]}: {c["tarea"]}</div>', unsafe_allow_html=True)
 
-# --- PANTALLA: GESTIÓN DE ASISTENCIA Y FICHAS FAMILIARES ---
+# --- PANTALLA: GESTIÓN DE ASISTENCIA Y CONTACTOS ---
 elif st.session_state.menu_actual == "👥 Asist":
     st.subheader("👥 Control de Asistencia y Fichas")
-    tab_asist, tab_fichas = st.tabs(["📌 Asistencia Semanal", "📇 Fichas de Contacto Familiar"])
+    tab_asist, tab_fichas = st.tabs(["📌 Asistencia de la Semana", "📇 Fichas de Contacto Completo"])
     
     with tab_asist:
         st.markdown(f"👦 **Total Asistentes:** `{len(alumnos_activos)} de {len(st.session_state.alumnos_master)}`")
@@ -249,7 +250,7 @@ elif st.session_state.menu_actual == "👥 Asist":
                 guardar_datos_locales(); st.rerun()
                 
     with tab_fichas:
-        st.markdown("### 📇 Consulta de Datos de Inscripción")
+        st.markdown("### 📇 Consulta de Datos Familiares")
         if st.session_state.perfiles_alumnos:
             al_f = st.selectbox("Seleccionar Alumno para ver detalles:", sorted(st.session_state.alumnos_master), key="sb_fichas_view")
             perfil = st.session_state.perfiles_alumnos.get(al_f, {})
@@ -262,9 +263,9 @@ elif st.session_state.menu_actual == "👥 Asist":
                 st.markdown(f"**👕 Talla Camiseta:** {perfil.get('Camiseta', 'No registrado')}")
                 st.markdown(f"**🎂 Nacimiento:** {perfil.get('Nacimiento', 'No registrado')}")
             else:
-                st.info("Este alumno no tiene datos de perfil extendidos registrados.")
+                st.info("Este alumno no tiene ficha detallada.")
         else:
-            st.info("Aún no hay fichas familiares registradas. Sube la tabla de inscripciones de Google en la pestaña Admin.")
+            st.info("Aún no hay fichas registradas. Sube una hoja Excel en la pestaña Admin para sincronizarlas.")
 
 # --- PANTALLA: CLASIFICACIONES ---
 elif st.session_state.menu_actual == "📊 Rank":
@@ -666,7 +667,7 @@ elif st.session_state.menu_actual == "⚠️ Mult":
         if not df_pen_hoy.empty: 
             st.dataframe(df_pen_hoy[['Alumno', 'Puntos', 'Detalle']], width='stretch')
 
-# --- PANTALLA: ADMIN (MEJORA: MAPEO DE CUADRANTE DE EXCEL INTEGRADO) ---
+# --- PANTALLA: ADMIN (PROTECCIÓN DE ACCIÓN POR BOTÓN DE CONFIRMACIÓN) ---
 elif st.session_state.menu_actual == "🛠️ Admin":
     st.subheader("🛠️ Panel de Administración")
     
@@ -675,60 +676,60 @@ elif st.session_state.menu_actual == "🛠️ Admin":
     excel_file = st.file_uploader("Seleccionar Excel de Alumnos:", type=["xlsx", "xls", "csv"], key="excel_masivo_uploader")
     
     if excel_file is not None:
-        try:
-            # Detectar formato de forma automática
-            if excel_file.name.endswith('.csv'):
-                df_inscritos = pd.read_csv(excel_file)
-            else:
-                df_inscritos = pd.read_excel(excel_file)
-                
-            # Limpiar filas y estructuras vacías que se generan al final de la tabla de respuestas
-            df_inscritos = df_inscritos.dropna(subset=[c for c in df_inscritos.columns if "Nombre y apellidos" in c or "Nombre" in c], how='all')
-            
-            # Localizar columnas clave mapeándolas dinámicamente con vuestros literales oficiales
-            col_nombre = [c for c in df_inscritos.columns if "Nombre y apellidos del niño" in c][0]
-            col_tel_padre = [c for c in df_inscritos.columns if "Número de teléfono del Padre" in c or "teléfono del Padre" in c][0]
-            col_tel_madre = [c for c in df_inscritos.columns if "Número de teléfono de la madre" in c or "teléfono de la madre" in c][0]
-            col_padre_nom = [c for c in df_inscritos.columns if "Nombre del padre" in c][0]
-            col_madre_nom = [c for c in df_inscritos.columns if "Nombre de la madre" in c][0]
-            col_colegio = [c for c in df_inscritos.columns if "Colegio" in c][0]
-            col_camiseta = [c for c in df_inscritos.columns if "Talla de camiseta" in c or "Camiseta" in c][0]
-            col_nacimiento = [c for c in df_inscritos.columns if "Fecha de nacimiento" in c or "nacimiento" in c][0]
-            
-            conteo_nuevos = 0
-            for _, fila in df_inscritos.iterrows():
-                nombre_completo = str(fila[col_nombre]).strip()
-                if nombre_completo and nombre_completo != "nan" and not nombre_completo.startswith("TOTAL"):
-                    # Forzar paso a lista master si el alumno no estaba registrado previamente
-                    if nombre_completo not in st.session_state.alumnos_master:
-                        st.session_state.alumnos_master.append(nombre_completo)
-                        conteo_nuevos += 1
+        # CORRECCIÓN: Botón explícito para lanzar la importación masiva solo cuando se pulsa, evitando el bucle infinito
+        if st.button("📥 Confirmar e Importar Alumnos del Excel", key="btn_confirmar_excel", type="primary"):
+            try:
+                if excel_file.name.endswith('.csv'):
+                    df_inscritos = pd.read_csv(excel_file)
+                else:
+                    df_inscritos = pd.read_excel(excel_file)
                     
-                    # Estructurar la ficha de contacto familiar
-                    st.session_state.perfiles_alumnos[nombre_completo] = {
-                        "Tel_Padre": str(fila[col_tel_padre]).replace(".0", "").strip(),
-                        "Tel_Madre": str(fila[col_tel_madre]).replace(".0", "").strip(),
-                        "Nombre_Padre": str(fila[col_padre_nom]).strip(),
-                        "Nombre_Madre": str(fila[col_madre_nom]).strip(),
-                        "Colegio": str(fila[col_colegio]).strip(),
-                        "Camiseta": str(fila[col_camiseta]).strip(),
-                        "Nacimiento": str(fila[col_nacimiento]).strip()
-                    }
-            guardar_datos_locales()
-            st.success(f"🚀 ¡Sincronización completada! Altas master: `{conteo_nuevos}` chavales. Fichas de contacto familiares indexadas: `{len(df_inscritos)}` alumnos.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error procesando el formato de inscripciones: {str(e)}. Verifica que las columnas no estén movidas.")
-            
+                df_inscritos = df_inscritos.dropna(subset=[c for c in df_inscritos.columns if "Nombre y apellidos" in c or "Nombre" in c], how='all')
+                
+                col_nombre = [c for c in df_inscritos.columns if "Nombre y apellidos del niño" in c][0]
+                col_tel_padre = [c for c in df_inscritos.columns if "Número de teléfono del Padre" in c or "teléfono del Padre" in c][0]
+                col_tel_madre = [c for c in df_inscritos.columns if "Número de teléfono de la madre" in c or "teléfono de la madre" in c][0]
+                col_padre_nom = [c for c in df_inscritos.columns if "Nombre del padre" in c][0]
+                col_madre_nom = [c for c in df_inscritos.columns if "Nombre de la madre" in c][0]
+                col_colegio = [c for c in df_inscritos.columns if "Colegio" in c][0]
+                col_camiseta = [c for c in df_inscritos.columns if "Talla de camiseta" in c or "Camiseta" in c][0]
+                col_nacimiento = [c for c in df_inscritos.columns if "Fecha de nacimiento" in c or "nacimiento" in c][0]
+                
+                conteo_nuevos = 0
+                for _, fila in df_inscritos.iterrows():
+                    nombre_completo = str(fila[col_nombre]).strip()
+                    if nombre_completo and nombre_completo != "nan" and not nombre_completo.startswith("TOTAL"):
+                        if nombre_completo not in st.session_state.alumnos_master:
+                            st.session_state.alumnos_master.append(nombre_completo)
+                            conteo_nuevos += 1
+                        
+                        st.session_state.perfiles_alumnos[nombre_completo] = {
+                            "Tel_Padre": str(fila[col_tel_padre]).replace(".0", "").strip(),
+                            "Tel_Madre": str(fila[col_tel_madre]).replace(".0", "").strip(),
+                            "Nombre_Padre": str(fila[col_padre_nom]).strip(),
+                            "Nombre_Madre": str(fila[col_madre_nom]).strip(),
+                            "Colegio": str(fila[col_colegio]).strip(),
+                            "Camiseta": str(fila[col_camiseta]).strip(),
+                            "Nacimiento": str(fila[col_nacimiento]).strip()
+                        }
+                guardar_datos_locales()
+                st.success(f"🚀 Sincronización completada. {conteo_nuevos} altas master. {len(df_inscritos)} fichas indexadas.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error procesando el formato de inscripciones: {str(e)}. Verifica que las columnas no estén movidas.")
+                
     st.markdown("---")
     st.markdown("### 🖼️ Cargar Imagen de Horario del Campus")
     archivo_imagen = st.file_uploader("Seleccionar imagen de horario:", type=["png", "jpg", "jpeg"], key="upload_admin_horario")
+    
     if archivo_imagen is not None:
-        with open(f"horario_{semana_act}.png", "wb") as f:
-            f.write(archivo_imagen.getbuffer())
-        st.success(f"¡Imagen de horario guardada correctamente para la {semana_act}!")
-        st.rerun()
-        
+        # CORRECCIÓN: Botón explícito para guardar la imagen, eliminando la congelación por bucle infinito
+        if st.button("💾 Confirmar y Guardar Imagen de Horario", key="btn_confirmar_imagen"):
+            with open(f"horario_{semana_act}.png", "wb") as f:
+                f.write(archivo_imagen.getbuffer())
+            st.success(f"¡Imagen de horario guardada correctamente para la {semana_act}!")
+            st.rerun()
+            
     st.markdown("---")
     st.subheader("🚨 Eliminar Alumno de los Registros")
     alumno_a_borrar = st.selectbox("Selecciona el alumno a eliminar:", ["--- Selecciona ---"] + sorted(st.session_state.alumnos_master))
