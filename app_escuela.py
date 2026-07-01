@@ -4,6 +4,7 @@ import plotly.express as px
 from datetime import date, datetime
 import json
 import os
+import random
 
 # --- 1. CONFIGURACIÓN DE PÁGINA (MARCA BLANCA MOBILE-FIRST) ---
 st.set_page_config(
@@ -39,7 +40,7 @@ st.markdown("""
             flex-wrap: nowrap !important;
             white-space: nowrap !important;
             display: flex !important;
-            gap: 1px !important; 
+            gap: 1px !important; /* Pestañas unidas y pegadas al 100% */
             padding: 3px 0px !important;
         }
         
@@ -54,6 +55,7 @@ st.markdown("""
             justify-content: center !important;
         }
         
+        /* Forzar que el texto sea visible dentro de las pestañas superiores */
         div[data-testid="element-container"]:has(#nav-marker) + div[data-testid="element-container"] div[role="radiogroup"] label p {
             color: #1e293b !important;
             font-weight: bold !important;
@@ -62,6 +64,7 @@ st.markdown("""
             padding: 0px !important;
         }
         
+        /* Pestaña seleccionada de modo activo */
         div[data-testid="element-container"]:has(#nav-marker) + div[data-testid="element-container"] div[role="radiogroup"] label[data-checked="true"] {
             background-color: #1e3a8a !important;
             border-color: #1e3a8a !important;
@@ -71,6 +74,7 @@ st.markdown("""
             color: white !important;
         }
         
+        /* Ocultar el círculo de selección interno sin romper el flujo de texto */
         div[data-testid="element-container"]:has(#nav-marker) + div[data-testid="element-container"] div[role="radiogroup"] label > div:first-child {
             width: 0px !important;
             height: 0px !important;
@@ -80,6 +84,7 @@ st.markdown("""
             padding: 0px !important;
         }
         
+        /* Ajuste de Checkboxes en Oraciones para evitar solapamientos */
         div[data-testid="stCheckbox"] { padding: 1px 0px !important; margin: 0px !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -572,71 +577,122 @@ elif st.session_state.menu_actual == "🧠 Jue":
             for m in miembros_eq: registrar_puntos(m, "Juegos", pts_juego, f"Juego: {motivo_juego} ({eq})")
             st.success(f"Puntos asignados a {tag_j}")
 
-# --- PANTALLA: VÍDEO FORMACIÓN ---
+# --- PANTALLA: VÍDEO FORMACIÓN (REDREDISEÑO DE ALGORITMO DE TURNOS 100% AUTOMÁTICO E INTELIGENTE) ---
 elif st.session_state.menu_actual == "🎥 Vid":
     st.subheader("🎥 Preguntas del Vídeo (2 Pts)")
-    if 'vid_preg_num' not in st.session_state: st.session_state.vid_preg_num = 1
     
-    conteo_v = {al: len(st.session_state.historico_puntos[(st.session_state.historico_puntos['Alumno'] == al) & (st.session_state.historico_puntos['Actividad'] == "Video Formación")]) if not st.session_state.historico_puntos.empty else 0 for al in alumnos_activos}
-
-    if st.button("🔄 Generar / Congelar Fila del Día"):
-        st.session_state.fixed_queue = sorted(alumnos_activos, key=lambda x: conteo_v[x])
-        st.session_state.vid_pointer = 0
-        st.success("¡Fila de sesión fijada correctamente!")
-
-    if 'fixed_queue' not in st.session_state:
-        st.session_state.fixed_queue = sorted(alumnos_activos, key=lambda x: conteo_v[x])
-        st.session_state.vid_pointer = 0
-
-    cola_fija = st.session_state.fixed_queue
-    total_cola = len(cola_fija)
-    p = st.session_state.vid_pointer
-    if p >= total_cola: p = 0; st.session_state.vid_pointer = 0
-    
-    st.write(f"❓ **Pregunta N° {st.session_state.vid_preg_num}**")
-    titular = cola_fija[p] if total_cola > 0 else "Nadie"
-    st.info(f"🎯 **Pregunta para:** {titular}")
-    
-    c_t1, c_t2 = st.columns([3, 1])
-    c_t1.write(f"🔹 Principal: **{titular}**")
-    if c_t2.button("✅ Acertó", key="v_tit_b"):
-        registrar_puntos(titular, "Video Formación", 2, f"Pregunta {st.session_state.vid_preg_num}")
-        st.session_state.vid_pointer = (cola_fija.index(titular) + 1) % total_cola
-        st.session_state.vid_preg_num += 1
-        st.rerun()
+    # Inicialización del número de pregunta del día si no existe
+    if 'vid_preg_num' not in st.session_state: 
+        st.session_state.vid_preg_num = 1
         
-    st.markdown("---")
-    for idx in range(1, 6):
-        if total_cola > idx:
-            reb_alumno = cola_fija[(p + idx) % total_cola]
-            cr_n, cr_b = st.columns([3, 1])
-            cr_n.write(f"↪️ Rebote {idx}: {reb_alumno}")
-            if cr_b.button(f"💥 Acertó Rebote {idx}", key=f"v_r_b_{idx}"):
-                registrar_puntos(reb_alumno, "Video Formación", 2, f"Preg {st.session_state.vid_preg_num} - Reb {idx}")
-                st.session_state.vid_pointer = (cola_fija.index(reb_alumno) + 1) % total_cola
-                st.session_state.vid_preg_num += 1
-                st.rerun()
-                
-    if st.button("⏭️ Saltar Pregunta"): 
-        st.session_state.vid_pointer = (st.session_state.vid_pointer + 1) % total_cola
-        st.session_state.vid_preg_num += 1
-        st.rerun()
+    df_h = st.session_state.historico_puntos
+    stats_video = {}
+    
+    # 1. Calcular de forma dinámica las estadísticas históricas de aciertos y participaciones reales para cada alumno asistente
+    for al in alumnos_activos:
+        if not df_h.empty:
+            df_al_vid = df_h[(df_h['Alumno'] == al) & (df_h['Actividad'] == "Video Formación")]
+            participaciones = len(df_al_vid)
+            aciertos = len(df_al_vid[df_al_vid['Puntos'] == 2])
+        else:
+            participaciones = 0
+            aciertos = 0
+        stats_video[al] = {"part": participaciones, "aciertos": aciertos}
         
-    st.markdown("---")
-    st.write("**🙋 Respuesta por Mano Levantada:**")
-    al_libre = st.selectbox("Asignar +2 puntos directos a:", ["--- Selecciona ---"] + alumnos_activos, key="sb_libre_vid")
-    if st.button("💾 Guardar Punto Mano Levantada"):
-        if al_libre != "--- Selecciona ---":
-            registrar_puntos(al_libre, "Video Formación", 2, "Respuesta libre mano levantada")
-            st.toast(f"🎥 +2 Pts a {al_libre}", icon="🎥")
+    # 2. Generar el algoritmo inteligente y dinámico de turnos para esta pregunta concreta
+    # Para que los empates sean totalmente al azar según el criterio 1, mezclamos primero los nombres de forma pseudoaleatoria usando el número de pregunta como semilla
+    alumnos_mezclados = alumnos_activos.copy()
+    random.seed(st.session_state.vid_preg_num + 142)
+    random.shuffle(alumnos_mezclados)
+    
+    # Función de pesado matemático para ordenar según vuestros 3 nuevos criterios estrictos de equidad
+    def evaluar_prioridad_video(alumno):
+        sv = stats_video[alumno]
+        part = sv["part"]
+        aciertos = sv["aciertos"]
+        
+        # Criterio 2: Quien no haya contestado nunca (ni bien ni mal) va en el grupo prioritario (0). Los demás al grupo (1)
+        grupo_participacion = 0 if part == 0 else 1
+        
+        # Devuelve la tupla de ordenación: (0 primero, menor número de aciertos, menor número de participaciones totales)
+        return (grupo_participacion, aciertos, part)
+        
+    # Ordenar la lista de alumnos asistentes de forma estricta según las prioridades
+    lista_prioridad = sorted(alumnos_mezclados, key=evaluar_prioridad_video)
+    total_disponibles = len(lista_prioridad)
+    
+    if total_disponibles > 0:
+        titular = lista_prioridad[0]
+        # Mostrar el panel principal de juego táctil
+        st.write(f"❓ **Pregunta N° {st.session_state.vid_preg_num}**")
+        st.info(f"🎯 **Pregunta Dirigida a:** {titular}")
+        
+        # Renderizado de botones de acción
+        c_t1, c_t2 = st.columns([3, 1])
+        c_t1.write(f"🔹 Alumno Principal: **{titular}**")
+        if c_t2.button("✅ Acertó (+2 Pts)", key="v_tit_b"):
+            registrar_puntos(titular, "Video Formación", 2, f"Pregunta {st.session_state.vid_preg_num} - Principal")
+            st.session_state.vid_preg_num += 1
+            st.toast(f"🎥 +2 Pts a {titular}")
             st.rerun()
             
+        st.markdown("---")
+        st.write("**↪️ Cadena de Rebotes oficiales (Siguiendo estricto orden de prioridad):**")
+        
+        # Mostrar hasta 5 rebotes calculados con la misma prioridad exacta de equidad (Criterio de rebotes automatizado)
+        num_rebotes_visibles = min(5, total_disponibles - 1)
+        for idx in range(1, num_rebotes_visibles + 1):
+            reb_alumno = lista_prioridad[idx]
+            cr_n, cr_b = st.columns([3, 1])
+            cr_n.write(f"↪️ Rebote {idx}: {reb_alumno}")
+            
+            if cr_b.button(f"💥 Acertó Rebote {idx} (+2 Pts)", key=f"v_r_b_{idx}"):
+                # CRITERIO 1 AUTOMÁTICO: El que acierta suma +2. El principal y los rebotes previos guardan automáticamente un Fallo (0 Pts) para sumar participación
+                registrar_puntos(titular, "Video Formación", 0, f"Pregunta {st.session_state.vid_preg_num} - Fallo Principal")
+                for j in range(1, idx):
+                    registrar_puntos(lista_prioridad[j], "Video Formación", 0, f"Pregunta {st.session_state.vid_preg_num} - Fallo Rebote {j}")
+                registrar_puntos(reb_alumno, "Video Formación", 2, f"Pregunta {st.session_state.vid_preg_num} - Acierto Rebote {idx}")
+                
+                st.session_state.vid_preg_num += 1
+                st.toast(f"🎥 Rebote ganado por {reb_alumno}")
+                st.rerun()
+                
+        # CRITERIO 2: Si todos los rebotes oficiales fallan, el monitor salta o elige a mano alzada entre los que levantan la mano
+        st.markdown("---")
+        if st.button("⏭️ Saltar Pregunta (Fallo General de Fila)"): 
+            registrar_puntos(titular, "Video Formación", 0, f"Pregunta {st.session_state.vid_preg_num} - Fallo Principal")
+            for j in range(1, num_rebotes_visibles + 1):
+                registrar_puntos(lista_prioridad[j], "Video Formación", 0, f"Pregunta {st.session_state.vid_preg_num} - Fallo Rebote {j}")
+            st.session_state.vid_preg_num += 1
+            st.rerun()
+            
+        st.markdown("---")
+        st.write("**🙋 Selección por Mano Levantada (Si fallan los rebotes oficiales):**")
+        al_libre = st.selectbox("Asignar +2 puntos de mano levantada a:", ["--- Selecciona ---"] + alumnos_activos, key="sb_libre_vid")
+        if st.button("💾 Guardar Punto Mano Levantada"):
+            if al_libre != "--- Selecciona ---":
+                # Al adjudicar por mano levantada, se aplica fallo automático a toda la línea oficial previa
+                registrar_puntos(titular, "Video Formación", 0, f"Pregunta {st.session_state.vid_preg_num} - Fallo Principal")
+                for j in range(1, num_rebotes_visibles + 1):
+                    registrar_puntos(lista_prioridad[j], "Video Formación", 0, f"Pregunta {st.session_state.vid_preg_num} - Fallo Rebote {j}")
+                registrar_puntos(al_libre, "Video Formación", 2, f"Pregunta {st.session_state.vid_preg_num} - Mano Levantada")
+                st.session_state.vid_preg_num += 1
+                st.toast(f"🎥 +2 Pts por mano levantada a {al_libre}")
+                st.rerun()
+    else:
+        st.info("No hay alumnos asistentes activos esta semana para generar turnos de vídeo.")
+            
+    # Tabla informativa de auditoría en tiempo real para control de los monitores
     st.markdown("---")
-    st.subheader("📊 Conteo de Aciertos en Vídeo Formación")
+    st.subheader("📊 Conteo de Aciertos y Participaciones en Vídeo Formación")
     listado_aciertos_video = []
     for al in sorted(alumnos_activos):
-        listado_aciertos_video.append({'Alumno': al, 'Preguntas Acertadas': conteo_v.get(al, 0)})
-    df_rank_video = pd.DataFrame(listado_aciertos_video).sort_values(by="Preguntas Acertadas", ascending=False)
+        listado_aciertos_video.append({
+            'Alumno': al,
+            'Preguntas Acertadas 🟢': stats_video[al]["aciertos"],
+            'Oportunidades / Turnos totales ⏱️': stats_video[al]["part"]
+        })
+    df_rank_video = pd.DataFrame(listado_aciertos_video).sort_values(by=["Preguntas Acertadas 🟢", "Oportunidades / Turnos totales ⏱️"], ascending=[False, True])
     st.dataframe(df_rank_video, use_container_width=True, hide_index=True)
 
 # --- PANTALLA: MULTAS ---
@@ -667,25 +723,18 @@ elif st.session_state.menu_actual == "⚠️ Mult":
         if not df_pen_hoy.empty: 
             st.dataframe(df_pen_hoy[['Alumno', 'Puntos', 'Detalle']], width='stretch')
 
-# --- PANTALLA: ADMIN (PROTECCIÓN DE ACCIÓN POR BOTÓN DE CONFIRMACIÓN) ---
+# --- PANTALLA: ADMIN ---
 elif st.session_state.menu_actual == "🛠️ Admin":
     st.subheader("🛠️ Panel de Administración")
-    
     st.markdown("### 📥 Inscripción Masiva y Sincronización de Respuestas de Google Forms")
-    st.caption("Sube el archivo de respuestas descargado de vuestro formulario (.xlsx / .csv):")
     excel_file = st.file_uploader("Seleccionar Excel de Alumnos:", type=["xlsx", "xls", "csv"], key="excel_masivo_uploader")
     
     if excel_file is not None:
-        # CORRECCIÓN: Botón explícito para lanzar la importación masiva solo cuando se pulsa, evitando el bucle infinito
         if st.button("📥 Confirmar e Importar Alumnos del Excel", key="btn_confirmar_excel", type="primary"):
             try:
-                if excel_file.name.endswith('.csv'):
-                    df_inscritos = pd.read_csv(excel_file)
-                else:
-                    df_inscritos = pd.read_excel(excel_file)
-                    
+                if excel_file.name.endswith('.csv'): df_inscritos = pd.read_csv(excel_file)
+                else: df_inscritos = pd.read_excel(excel_file)
                 df_inscritos = df_inscritos.dropna(subset=[c for c in df_inscritos.columns if "Nombre y apellidos" in c or "Nombre" in c], how='all')
-                
                 col_nombre = [c for c in df_inscritos.columns if "Nombre y apellidos del niño" in c][0]
                 col_tel_padre = [c for c in df_inscritos.columns if "Número de teléfono del Padre" in c or "teléfono del Padre" in c][0]
                 col_tel_madre = [c for c in df_inscritos.columns if "Número de teléfono de la madre" in c or "teléfono de la madre" in c][0]
@@ -702,7 +751,6 @@ elif st.session_state.menu_actual == "🛠️ Admin":
                         if nombre_completo not in st.session_state.alumnos_master:
                             st.session_state.alumnos_master.append(nombre_completo)
                             conteo_nuevos += 1
-                        
                         st.session_state.perfiles_alumnos[nombre_completo] = {
                             "Tel_Padre": str(fila[col_tel_padre]).replace(".0", "").strip(),
                             "Tel_Madre": str(fila[col_tel_madre]).replace(".0", "").strip(),
@@ -713,20 +761,16 @@ elif st.session_state.menu_actual == "🛠️ Admin":
                             "Nacimiento": str(fila[col_nacimiento]).strip()
                         }
                 guardar_datos_locales()
-                st.success(f"🚀 Sincronización completada. {conteo_nuevos} altas master. {len(df_inscritos)} fichas indexadas.")
+                st.success(f"🚀 Sincronización completada. {conteo_nuevos} altas master.")
                 st.rerun()
-            except Exception as e:
-                st.error(f"Error procesando el formato de inscripciones: {str(e)}. Verifica que las columnas no estén movidas.")
+            except Exception as e: st.error(f"Error procesando el formato: {str(e)}")
                 
     st.markdown("---")
     st.markdown("### 🖼️ Cargar Imagen de Horario del Campus")
     archivo_imagen = st.file_uploader("Seleccionar imagen de horario:", type=["png", "jpg", "jpeg"], key="upload_admin_horario")
-    
     if archivo_imagen is not None:
-        # CORRECCIÓN: Botón explícito para guardar la imagen, eliminando la congelación por bucle infinito
         if st.button("💾 Confirmar y Guardar Imagen de Horario", key="btn_confirmar_imagen"):
-            with open(f"horario_{semana_act}.png", "wb") as f:
-                f.write(archivo_imagen.getbuffer())
+            with open(f"horario_{semana_act}.png", "wb") as f: f.write(archivo_imagen.getbuffer())
             st.success(f"¡Imagen de horario guardada correctamente para la {semana_act}!")
             st.rerun()
             
@@ -743,24 +787,3 @@ elif st.session_state.menu_actual == "🛠️ Admin":
                 if alumno_a_borrar in st.session_state.asistencia[s]: del st.session_state.asistencia[s][alumno_a_borrar]
             guardar_datos_locales()
             st.toast(f"🗑️ Eliminado: {alumno_a_borrar}"); st.rerun()
-            
-    st.markdown("---")
-    st.subheader("📥 Carga a Granel (Semana 1)")
-    with st.form("form_granel"):
-        alumno_g = st.selectbox("Alumno:", sorted(st.session_state.alumnos_master))
-        puntos_g = st.number_input("Puntos:", min_value=0, max_value=500, value=0)
-        motivo_g = st.text_input("Motivo:", "Volcado masivo Excel Semana 1")
-        if st.form_submit_button("🚀 Inyectar"):
-            if puntos_g > 0:
-                registrar_puntos(alumno_g, "Volcado Inicial", puntos_g, motivo_g)
-                st.success("Puntos inyectados.")
-            else: st.error("Introduce una puntuación válida.")
-
-    st.markdown("---")
-    st.subheader("🆕 Alta de Alumnos Nuevos")
-    nuevo_nombre = st.text_input("Nombre completo del nuevo alumno:")
-    if st.button("➕ Dar de alta Alumno"):
-        if nuevo_nombre and nuevo_nombre not in st.session_state.alumnos_master:
-            st.session_state.alumnos_master.append(nuevo_nombre)
-            guardar_datos_locales()
-            st.success(f"¡{nuevo_nombre} dado de alta!"); st.rerun()
